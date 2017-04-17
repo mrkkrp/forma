@@ -2,6 +2,8 @@
 {-# LANGUAGE ExplicitForAll             #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -12,67 +14,107 @@
 module Web.Formaldehyde
   ( -- * Constructing a form
     field
-  , optional
     -- * Running a form
   , runForm
   , pick
-    -- * Some types
+  , mkFieldError
+    -- * Types
   , FormParser
-  , FormResult )
+  , FormResult
+  , FieldError )
 where
 
-import Control.Applicative hiding (optional)
+import Control.Applicative
 import Control.Monad.Except
-import Control.Monad.Reader
-import Control.Monad.Writer (WriterT (..))
 import Data.Aeson
-import Data.ByteString (ByteString)
-import Data.Functor.Alt
+import Data.Bifunctor (first)
+import Data.Default.Class
+import Data.Either (isRight)
 import Data.Kind
-import Data.List.NonEmpty (NonEmpty)
-import Data.Map (Map)
-import Data.Maybe (isJust)
+import Data.Map.Strict (Map)
 import Data.Proxy
-import Data.Scientific (Scientific)
 import Data.Semigroup (Semigroup (..))
 import Data.Text (Text)
 import GHC.TypeLits
-import qualified Data.List.NonEmpty as NE
-import qualified Data.Map           as M
-import qualified Data.Scientific    as C
-import qualified Data.Semigroup     as S
+import qualified Control.Monad.Fail as Fail
+import qualified Data.Aeson.Types   as A
+import qualified Data.Map.Strict    as M
 import qualified Data.Text          as T
 
 ----------------------------------------------------------------------------
 -- Types
 
 newtype FormParser (names :: [Symbol]) m a
-  = FormParser (WriterT FieldError (ReaderT Value m) a)
-  deriving (Functor, Applicative, Monad)
+  = FormParser (Value -> m (Either String a, FieldError names))
 
-instance Monad m => Alt (FormParser names m) where
-  (FormParser x) <!> (FormParser y) = FormParser . WriterT $ do
-    (x0, e0) <- runWriterT x
-    (y1, e1) <- runWriterT y
-    let nullError (FieldError m _) = isJust m
-    return $
-      if nullError e0
-        then (x0, e0)
-        else (y1, e1)
+instance Functor m => Functor (FormParser names m) where
+  fmap f (FormParser x) = FormParser $
+    fmap (first (fmap f)) . x
 
-data FieldError = FieldError (Maybe String) (Map Text Value)
+instance Applicative m => Applicative (FormParser names m) where
+  pure x = (FormParser . const . pure) (Right x, mempty)
+  (FormParser f) <*> (FormParser x) = FormParser $ \v ->
+    let g (ef, e0) (ex, e1) = (ef <*> ex, e0 <> e1)
+    in pure g <*> f v <*> x v
 
-instance Semigroup FieldError where
-  (FieldError m0 x) <> (FieldError m1 y) = FieldError (m0 <|> m1) (M.union x y)
+instance Applicative m => Alternative (FormParser names m) where
+  empty = (FormParser . const . pure) (Left "empty", mempty)
+  (FormParser x) <|> (FormParser y) = FormParser $ \v ->
+    let g (ex, e0) ~(ey, e1) =
+          if isRight ex
+            then (ex, e0)
+            else (ey, e1)
+    in pure g <*> x v <*> y v
 
-instance Monoid FieldError where
-  mempty  = FieldError Nothing M.empty
+instance Monad m => Monad (FormParser names m) where
+  return = pure
+  FormParser m >>= f = FormParser $ \v -> do
+    (ex, e0) <- m v
+    case ex of
+      Left err -> return (Left err, e0)
+      Right x -> do
+        let (FormParser n) = f x
+        (ey, e1) <- n v
+        return (ey, e0 <> e1)
+  fail = Fail.fail
+
+instance Monad m => Fail.MonadFail (FormParser names m) where
+  fail msg = (FormParser . const . return) (Left msg, mempty)
+
+instance Monad m => MonadPlus (FormParser names m) where
+  mzero = empty
+  mplus = (<|>)
+
+instance Monad m => MonadTrans (FormParser names) where
+  lift m = FormParser . const $
+    let f x = (Right x, mempty)
+    in fmap f m
+
+data FieldError (names :: [Symbol]) =
+  FieldError (Map Text Value)
+
+instance Semigroup (FieldError names) where
+  (FieldError x) <> (FieldError y) = FieldError (M.union x y)
+
+instance Monoid (FieldError names) where
+  mempty  = FieldError M.empty
   mappend = (<>)
 
-data FormResult
-  = FormResultErrors (NonEmpty FieldError)
-  | FormResultRedirect ByteString
-  | FormResultSuccess
+instance ToJSON (FieldError names) where
+  toJSON (FieldError m) = (object . fmap f . M.toAscList) m
+    where
+      f (name, err) = name .= err
+
+mkFieldError :: ToJSON e
+  => SelectedName names -- ^ The field name
+  -> e                 -- ^ Data that represents error
+  -> FieldError names
+mkFieldError name x =
+  FieldError (M.singleton (unSelectedName name) (toJSON x))
+
+data FormResult (names :: [Symbol]) a
+  = FormResultErrors (FieldError names)
+  | FormResultSuccess a (Maybe Text)
 
 type family InSet (n :: Symbol) (ns :: [Symbol]) :: Constraint where
   InSet n '[]    = TypeError
@@ -92,19 +134,28 @@ pick = (SelectedName . T.pack . symbolVal) (Proxy :: Proxy name)
 unSelectedName :: SelectedName names -> Text
 unSelectedName (SelectedName txt) = txt
 
+data Response (names :: [Symbol]) = Response
+  { responseParseError :: Maybe String
+  , responseRedirectTo :: Maybe Text
+  , responseFieldError :: FieldError names
+  , responseResult     :: Value }
+
+instance Default (Response names) where
+  def = Response
+    { responseParseError = Nothing
+    , responseRedirectTo = Nothing
+    , responseFieldError = mempty
+    , responseResult     = Null }
+
+instance ToJSON (Response names) where
+  toJSON Response {..} = object
+    [ "parse_error"  .= responseParseError
+    , "redirect_to"  .= responseRedirectTo
+    , "field_errors" .= responseFieldError
+    , "result"       .= responseResult ]
+
 ----------------------------------------------------------------------------
 -- Constructing a form
-
-mkValidationError :: ToJSON e
-  => Text              -- ^ The field name
-  -> e                 -- ^ Data that represents error
-  -> FieldError
-mkValidationError name x = FieldError Nothing (M.singleton name (toJSON x))
-
-mkParseError
-  :: String            -- ^ Parse error as returned by Aeson
-  -> FieldError
-mkParseError err = FieldError (pure err) M.empty
 
 -- | Make a field that parses a 'Text' value.
 
@@ -116,30 +167,39 @@ field :: forall (name :: Symbol) (names :: [Symbol]) m e s a.
   , FromJSON s )
   => (s -> ExceptT e m a)
   -> FormParser names m a
-field check = FormParser $ do
-  value <- ask
-  undefined
-
--- | One or none.
-
-optional :: (Alt f, Applicative f) => f a -> f (Maybe a)
-optional x = Just <$> x <!> pure Nothing
+field check = FormParser $ \v -> do
+  let name = pick @name @names
+      f :: Value -> A.Parser s
+      f = withObject "form field" (.: unSelectedName name)
+      r = A.parseEither f v
+  case r of
+    Left parseError -> return (Left parseError, mempty)
+    Right r' -> do
+      e <- runExceptT (check r')
+      return $ case e of
+        Left verr ->
+          (Right undefined, mkFieldError name (toJSON verr))
+        Right x ->
+          (Right x, mempty)
 
 ----------------------------------------------------------------------------
 -- Running a form
 
-runForm :: Monad m => FormParser names m a -> (a -> m FormResult) -> m Value
-runForm = undefined
-
--- {
---   "parse_error": "here goes aeson parse error",
---   "redirect_to": null,
---   "validation_errors":
---     [
---       {
---         "field": "my_field",
---         "message": "Here we go, it's all wrong."
---       }
---     ],
---   "result": 5
--- }
+runForm :: (Monad m, ToJSON b)
+  => FormParser names m a
+  -> Value
+  -> (a -> m (FormResult names b))
+  -> m Value
+runForm (FormParser p) v f = do
+  (ex, es) <- p v
+  case ex of
+    Left parseError -> return . toJSON $
+      def { responseParseError = pure parseError }
+    Right result -> do
+      r <- f result
+      return . toJSON $ case r of
+        FormResultErrors es' ->
+          def { responseFieldError = es <> es' }
+        FormResultSuccess x murl ->
+          def { responseRedirectTo = murl
+              , responseResult     = toJSON x }
