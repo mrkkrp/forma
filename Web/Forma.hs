@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE ExplicitForAll             #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
@@ -27,78 +28,71 @@ where
 import Control.Applicative
 import Control.Monad.Except
 import Data.Aeson
-import Data.Bifunctor (first)
 import Data.Default.Class
-import Data.Either (isRight)
 import Data.Kind
 import Data.Map.Strict (Map)
 import Data.Proxy
 import Data.Semigroup (Semigroup (..))
 import Data.Text (Text)
 import GHC.TypeLits
-import qualified Control.Monad.Fail as Fail
-import qualified Data.Aeson.Types   as A
-import qualified Data.Map.Strict    as M
-import qualified Data.Text          as T
+import qualified Data.Aeson.Types    as A
+import qualified Data.HashMap.Strict as HM
+import qualified Data.Map.Strict     as M
+import qualified Data.Text           as T
 
 ----------------------------------------------------------------------------
 -- Types
 
+data BranchState names a
+  = BranchParsingFailed String
+  | BranchValidationFailed (FieldError names)
+  | BranchSucceeded a
+  deriving Functor
+
+instance Applicative (BranchState names) where
+  pure = BranchSucceeded
+  (BranchParsingFailed    msg) <*> _ =
+    BranchParsingFailed msg
+  (BranchValidationFailed _) <*> (BranchParsingFailed msg) =
+    BranchParsingFailed msg
+  (BranchValidationFailed err0) <*> (BranchValidationFailed err1) =
+    BranchValidationFailed (err0 <> err1)
+  (BranchValidationFailed err) <*> BranchSucceeded _ =
+    BranchValidationFailed err
+  BranchSucceeded _ <*> (BranchParsingFailed msg) =
+    BranchParsingFailed msg
+  BranchSucceeded _ <*> (BranchValidationFailed err) =
+    BranchValidationFailed err
+  BranchSucceeded f <*> BranchSucceeded x =
+    BranchSucceeded (f x)
+
 newtype FormParser (names :: [Symbol]) m a
-  = FormParser (Value -> m (Either String a, FieldError names))
+  = FormParser { runFormParser :: Value -> m (BranchState names a) }
 
 instance Functor m => Functor (FormParser names m) where
   fmap f (FormParser x) = FormParser $
-    fmap (first (fmap f)) . x
+    fmap (fmap f) . x
 
 instance Applicative m => Applicative (FormParser names m) where
-  pure x = (FormParser . const . pure) (Right x, mempty)
+  pure x = (FormParser . const . pure) (BranchSucceeded x)
   (FormParser f) <*> (FormParser x) = FormParser $ \v ->
-    let g (ef, e0) (ex, e1) = (ef <*> ex, e0 <> e1)
-    in pure g <*> f v <*> x v
+    pure (<*>) <*> f v <*> x v
 
 instance Applicative m => Alternative (FormParser names m) where
-  empty = (FormParser . const . pure) (Left "empty", mempty)
+  empty = (FormParser . const . pure) (BranchParsingFailed "empty")
   (FormParser x) <|> (FormParser y) = FormParser $ \v ->
-    let g (ex, e0) ~(ey, e1) =
-          if isRight ex
-            then (ex, e0)
-            else (ey, e1)
+    let g x' y' =
+          case x' of
+            BranchParsingFailed    _ -> y'
+            BranchValidationFailed _ -> x'
+            BranchSucceeded        _ -> x'
     in pure g <*> x v <*> y v
-
-instance Monad m => Monad (FormParser names m) where
-  return = pure
-  FormParser m >>= f = FormParser $ \v -> do
-    (ex, e0) <- m v
-    case ex of
-      Left err -> return (Left err, e0)
-      Right x -> do
-        let (FormParser n) = f x
-        (ey, e1) <- n v
-        return (ey, e0 <> e1)
-  fail = Fail.fail
-
-instance Monad m => Fail.MonadFail (FormParser names m) where
-  fail msg = (FormParser . const . return) (Left msg, mempty)
-
-instance Monad m => MonadPlus (FormParser names m) where
-  mzero = empty
-  mplus = (<|>)
-
-instance Monad m => MonadTrans (FormParser names) where
-  lift m = FormParser . const $
-    let f x = (Right x, mempty)
-    in fmap f m
 
 data FieldError (names :: [Symbol]) =
   FieldError (Map Text Value)
 
 instance Semigroup (FieldError names) where
   (FieldError x) <> (FieldError y) = FieldError (M.union x y)
-
-instance Monoid (FieldError names) where
-  mempty  = FieldError M.empty
-  mappend = (<>)
 
 instance ToJSON (FieldError names) where
   toJSON (FieldError m) = (object . fmap f . M.toAscList) m
@@ -137,27 +131,25 @@ unSelectedName (SelectedName txt) = txt
 data Response (names :: [Symbol]) = Response
   { responseParseError :: Maybe String
   , responseRedirectTo :: Maybe Text
-  , responseFieldError :: FieldError names
+  , responseFieldError :: Maybe (FieldError names)
   , responseResult     :: Value }
 
 instance Default (Response names) where
   def = Response
     { responseParseError = Nothing
     , responseRedirectTo = Nothing
-    , responseFieldError = mempty
+    , responseFieldError = Nothing
     , responseResult     = Null }
 
 instance ToJSON (Response names) where
   toJSON Response {..} = object
     [ "parse_error"  .= responseParseError
     , "redirect_to"  .= responseRedirectTo
-    , "field_errors" .= responseFieldError
+    , "field_errors" .= maybe (Object HM.empty) toJSON responseFieldError
     , "result"       .= responseResult ]
 
 ----------------------------------------------------------------------------
 -- Constructing a form
-
--- | Make a field that parses a 'Text' value.
 
 field :: forall (name :: Symbol) (names :: [Symbol]) m e s a.
   ( KnownSymbol name
@@ -173,14 +165,14 @@ field check = FormParser $ \v -> do
       f = withObject "form field" (.: unSelectedName name)
       r = A.parseEither f v
   case r of
-    Left parseError -> return (Left parseError, mempty)
+    Left parseError -> pure (BranchParsingFailed parseError)
     Right r' -> do
       e <- runExceptT (check r')
       return $ case e of
         Left verr ->
-          (Right undefined, mkFieldError name (toJSON verr))
+          (BranchValidationFailed (mkFieldError name verr))
         Right x ->
-          (Right x, mempty)
+          (BranchSucceeded x)
 
 ----------------------------------------------------------------------------
 -- Running a form
@@ -191,15 +183,17 @@ runForm :: (Monad m, ToJSON b)
   -> (a -> m (FormResult names b))
   -> m Value
 runForm (FormParser p) v f = do
-  (ex, es) <- p v
-  case ex of
-    Left parseError -> return . toJSON $
+  r <- p v
+  case r of
+    BranchParsingFailed parseError -> return . toJSON $
       def { responseParseError = pure parseError }
-    Right result -> do
-      r <- f result
-      return . toJSON $ case r of
-        FormResultErrors es' ->
-          def { responseFieldError = es <> es' }
-        FormResultSuccess x murl ->
+    BranchValidationFailed validationError -> return . toJSON $
+      def { responseFieldError = pure validationError }
+    BranchSucceeded x -> do
+      r' <- f x
+      return . toJSON $ case r' of
+        FormResultErrors validationError ->
+          def { responseFieldError = pure validationError }
+        FormResultSuccess result murl ->
           def { responseRedirectTo = murl
-              , responseResult     = toJSON x }
+              , responseResult     = toJSON result }
