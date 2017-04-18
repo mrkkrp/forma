@@ -1,3 +1,3 @@
-## Formaldehyde 0.1.0
+## Forma 0.1.0
 
 * Initial release.

@@ -1,5 +1,5 @@
 --
--- Tests for the ‘formaldehyde’ package.
+-- Tests for the ‘forma’ package.
 --
 -- Copyright © 2017 Mark Karpov <markkarpov@openmailbox.org>
 --

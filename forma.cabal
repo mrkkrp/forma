@@ -1,5 +1,5 @@
 --
--- Cabal configuration for ‘formaldehyde’ package.
+-- Cabal configuration for ‘forma’ package.
 --
 -- Copyright © 2017 Mark Karpov <markkarpov@openmailbox.org>
 --
@@ -30,15 +30,15 @@
 -- ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 -- POSSIBILITY OF SUCH DAMAGE.
 
-name:                 formaldehyde
+name:                 forma
 version:              0.1.0
 cabal-version:        >= 1.10
 license:              BSD3
 license-file:         LICENSE.md
 author:               Mark Karpov <markkarpov@openmailbox.org>
 maintainer:           Mark Karpov <markkarpov@openmailbox.org>
-homepage:             https://github.com/mrkkrp/formaldehyde
-bug-reports:          https://github.com/mrkkrp/formaldehyde/issues
+homepage:             https://github.com/mrkkrp/forma
+bug-reports:          https://github.com/mrkkrp/forma/issues
 category:             Web
 synopsis:             Process forms sent to you in JSON format like a man
 build-type:           Simple
@@ -48,7 +48,7 @@ extra-doc-files:      CHANGELOG.md
 
 source-repository head
   type:               git
-  location:           https://github.com/mrkkrp/formaldehyde.git
+  location:           https://github.com/mrkkrp/forma.git
 
 flag dev
   description:        Turn on development settings.
@@ -66,7 +66,7 @@ library
     -- packages providing modules that moved into base-4.9.0.0
     build-depends:    semigroups     == 0.18.*
 
-  exposed-modules:    Web.Formaldehyde
+  exposed-modules:    Web.Forma
   if flag(dev)
     ghc-options:      -Wall -Werror
   else
@@ -78,7 +78,7 @@ test-suite tests
   hs-source-dirs:     tests
   type:               exitcode-stdio-1.0
   build-depends:      base             >= 4.7 && < 5.0
-                    , formaldehyde     >= 0.1.0
+                    , forma            >= 0.1.0
                     , hspec            >= 2.0 && < 3.0
   if flag(dev)
     ghc-options:      -Wall -Werror

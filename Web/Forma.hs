@@ -11,7 +11,7 @@
 {-# LANGUAGE UndecidableInstances       #-}
 {-# language AllowAmbiguousTypes        #-}
 
-module Web.Formaldehyde
+module Web.Forma
   ( -- * Constructing a form
     field
     -- * Running a form
