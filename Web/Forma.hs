@@ -107,7 +107,7 @@ mkFieldError name x =
   FieldError (M.singleton (unSelectedName name) (toJSON x))
 
 data FormResult (names :: [Symbol]) a
-  = FormResultErrors (FieldError names)
+  = FormResultError (FieldError names)
   | FormResultSuccess a (Maybe Text)
 
 type family InSet (n :: Symbol) (ns :: [Symbol]) :: Constraint where
@@ -192,7 +192,7 @@ runForm (FormParser p) v f = do
     BranchSucceeded x -> do
       r' <- f x
       return . toJSON $ case r' of
-        FormResultErrors validationError ->
+        FormResultError validationError ->
           def { responseFieldError = pure validationError }
         FormResultSuccess result murl ->
           def { responseRedirectTo = murl
