@@ -205,6 +205,10 @@ type family InSet (n :: Symbol) (ns :: [Symbol]) :: Constraint where
 -- >
 -- > myName :: SelectedName Fields
 -- > myName = pick @"foo" @Fields
+--
+-- It's a good idea to use 'pick' to get field names not only where this
+-- approach is imposed by the library, but everywhere you need to use the
+-- field names, in your templates for example.
 
 pick :: forall (name :: Symbol) (names :: [Symbol]).
   ( KnownSymbol name
