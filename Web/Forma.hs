@@ -76,7 +76,7 @@ module Web.Forma
   , mkFieldError
     -- * Types and type functions
   , FormParser
-  , FormResult
+  , FormResult (..)
   , SelectedName
   , InSet
   , FieldError )
@@ -169,7 +169,9 @@ instance Applicative m => Alternative (FormParser names m) where
 
 data FormResult (names :: [Symbol]) a
   = FormResultError (FieldError names)
+    -- ^ Form submission failed, here are the validation errors.
   | FormResultSuccess a
+    -- ^ Form submission succeeded, send this info.
   deriving (Eq, Show)
 
 -- | @'SelectedName' names@ represents a name ('Text' value) that is
@@ -290,16 +292,33 @@ instance ToJSON (Response names) where
 -- > loginForm = LoginForm
 -- >   <$> field @"username" notEmpty
 -- >   <*> field @"password" notEmpty
--- >   <*> field @"remember_me" ret
+-- >   <*> field' @"remember_me"
 -- >
 -- > notEmpty :: Monad m => Text -> ExceptT Text m Text
 -- > notEmpty txt =
 -- >   if T.null txt
 -- >     then throwError "This field cannot be empty"
 -- >     else return txt
--- >
--- > ret :: Monad m => Bool -> ExceptT Text m Bool
--- > ret = return -- needed to remove ambiguity
+--
+-- Referring to the types in the function's signature, @s@ is extracted from
+-- JSON 'Value' for you automatically using its 'FromJSON' instance. The
+-- field value is taken in assumption that top level 'Value' is a
+-- dictionary, and field name is a key in that dictionary. So for example a
+-- valid JSON input for the form shown above could be this:
+--
+-- > {
+-- >   "username": "Bob",
+-- >   "password": "123",
+-- >   "remember_me": true
+-- > }
+--
+-- Once value of type @s@ is extracted, validation phase beings. The
+-- supplied checker (you can easy compose them with @('>=>')@, as they are
+-- Kleisli arrows) is applied to the @s@ value and validation either
+-- succeeds producing an @a@ value, or we collect an error in the form of a
+-- value of @e@ type, which is fed into 'mkFieldError' internally.
+--
+-- To run a form composed from 'field's, see 'runForm'.
 
 field :: forall (name :: Symbol) (names :: [Symbol]) m e s a.
   ( KnownSymbol name
@@ -308,6 +327,8 @@ field :: forall (name :: Symbol) (names :: [Symbol]) m e s a.
   , ToJSON e
   , FromJSON s )
   => (s -> ExceptT e m a)
+     -- ^ Checker that performs validation and possibly transformation of
+     -- the field value
   -> FormParser names m a
 field check = FormParser $ \v -> do
   let name = pick @name @names
@@ -340,11 +361,30 @@ field' = field @name check
 ----------------------------------------------------------------------------
 -- Running a form
 
+-- | Run the supplied parser on given input and call the specified callback
+-- that uses the result of parsing on success.
+--
+-- The callback can either report a 'FieldError' (one or more), or report
+-- success providing a value that will be converted to JSON and including in
+-- the resulting 'Value' (response).
+--
+-- The resulting 'Value' has the following format:
+--
+-- > {
+-- >   "parse_error": "Text or null."
+-- >   "field_errors":
+-- >     {
+-- >       "foo": "Foo's error serialized to JSON.",
+-- >       "bar": "Bar's error…"
+-- >     }
+-- >   "result": "What you return from the callback in FormResultSuccess."
+-- > }
+
 runForm :: (Monad m, ToJSON b)
-  => FormParser names m a
-  -> Value
-  -> (a -> m (FormResult names b))
-  -> m Value
+  => FormParser names m a -- ^ The form parser to run
+  -> Value             -- ^ Input for the parser
+  -> (a -> m (FormResult names b)) -- ^ Callback that is called on success
+  -> m Value           -- ^ The result to send back to the client
 runForm (FormParser p) v f = do
   r <- p v
   case r of
