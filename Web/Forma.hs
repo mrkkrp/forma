@@ -369,7 +369,7 @@ field' = field @name check
 -- that uses the result of parsing on success.
 --
 -- The callback can either report a 'FieldError' (one or more), or report
--- success providing a value that will be converted to JSON and including in
+-- success providing a value that will be converted to JSON and included in
 -- the resulting 'Value' (response).
 --
 -- The resulting 'Value' has the following format:
