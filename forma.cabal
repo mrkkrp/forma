@@ -41,9 +41,9 @@ maintainer:           Mark Karpov <markkarpov@openmailbox.org>
 homepage:             https://github.com/mrkkrp/forma
 bug-reports:          https://github.com/mrkkrp/forma/issues
 category:             Web
-synopsis:             Process forms sent to you in JSON format like a man
+synopsis:             Parse and validate forms in JSON format
 build-type:           Simple
-description:          Process forms sent to you in JSON format like a man.
+description:          Parse and validate forms in JSON format.
 extra-doc-files:      CHANGELOG.md
                     , README.md
 
