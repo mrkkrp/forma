@@ -52,6 +52,7 @@
 -- You need to enable at least @DataKinds@ and @TypeApplications@ language
 -- extensions to use this library.
 
+{-# LANGUAGE AllowAmbiguousTypes  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DeriveFunctor        #-}
 {-# LANGUAGE ExplicitForAll       #-}
@@ -63,7 +64,6 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# language AllowAmbiguousTypes  #-}
 
 module Web.Forma
   ( -- * Constructing a form
