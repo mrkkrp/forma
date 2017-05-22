@@ -131,12 +131,12 @@ instance Applicative (BranchState names) where
 --
 -- 'FormParser' is parametrized by three type variables:
 --
---     * @names@ — collection of field names we can use in a form to be
---       parsed with this parser.
---     * @m@ — underlying monad, 'FormParser' is not a monad itself, so it's
+--     * @names@—collection of field names we can use in a form to be parsed
+--       with this parser.
+--     * @m@—underlying monad, 'FormParser' is not a monad itself, so it's
 --       not a monad transformer, but validation can make use of the @m@
 --       monad.
---     * @a@ — result of parsing.
+--     * @a@—result of parsing.
 --
 -- 'FormParser' is not a monad because it's not possible to write a 'Monad'
 -- instance with the properties that we want (validation errors should not
