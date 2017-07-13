@@ -14,6 +14,14 @@ import Test.Hspec
 import Web.Forma
 import qualified Data.Text as T
 
+
+notEmpty :: Monad m => Text -> ExceptT Text m Text
+notEmpty txt =
+  if T.null txt
+    then throwError "This field cannot be empty."
+    else return txt
+
+
 type LoginFields = '["username", "password", "remember_me"]
 
 data LoginForm = LoginForm
@@ -28,11 +36,29 @@ loginForm = LoginForm
   <*> field @"password" notEmpty
   <*> (empty <|> field' @"remember_me" <|> pure True)
 
-notEmpty :: Monad m => Text -> ExceptT Text m Text
-notEmpty txt =
-  if T.null txt
-    then throwError "This field cannot be empty."
-    else return txt
+
+type SignupFields = '["username", "password", "password_confirmation"]
+
+data SignupForm = SignupForm
+  { signupUsername :: Text
+  , signupPassword :: Text
+  }
+
+tupleValuesMatch :: Monad m => FieldError names -> ((Text, Text) -> ExceptT (FieldError names) m Text)
+tupleValuesMatch err (a,b) =
+  if a == b
+    then return a
+    else throwError err
+
+signupForm :: Monad m => FormParser SignupFields m SignupForm
+signupForm = SignupForm
+  <$> field @"username" notEmpty
+  <*> (addValidation
+        ((,) <$> field @"password" notEmpty <*> field @"password_confirmation" notEmpty)
+        (tupleValuesMatch (fieldError @"password_confirmation" "Passwords don't match!"))
+      )
+
+
 
 main :: IO ()
 main = hspec spec
@@ -83,7 +109,7 @@ spec = describe "Forma" $ do
             , "field_errors" .= object
               [ "username" .= msg0
               , "password" .= msg1 ]
-            , "result"       .= Null ]
+            , "result"     .= Null ]
     context "when validation errors happen in 1 step" $
       it "all of them are reported" $ do
         let input = object
@@ -98,3 +124,47 @@ spec = describe "Forma" $ do
             [ "username" .= String "This field cannot be empty."
             , "password" .= String "This field cannot be empty." ]
           , "result"       .= Null ]
+
+  context "For addValidation being used in SignupForm example" $ do
+    context "when both password fields are empty" $ 
+      it "we get errors for both empty password fields" $ do
+        let input = object
+              [ "username"    .= String ""
+              , "password"    .= String ""
+              , "password_confirmation" .= String "" ]
+        r <- runForm signupForm input $ \_ ->
+          return (FormResultSuccess ())
+        r `shouldBe` object
+          [ "parse_error"  .= Null
+          , "field_errors" .= object
+            [ "username" .= String "This field cannot be empty."
+            , "password" .= String "This field cannot be empty."
+            , "password_confirmation" .= String "This field cannot be empty." ]
+          , "result"       .= Null ]
+    context "when both password fields contain values that don't match" $
+      it "the validation added with addValidation reports that passwords don't match" $ do
+        let input = object
+              [ "username"    .= String ""
+              , "password"    .= String "abc"
+              , "password_confirmation" .= String "def" ]
+        r <- runForm signupForm input $ \_ ->
+          return (FormResultSuccess ())
+        r `shouldBe` object
+          [ "parse_error"  .= Null
+          , "field_errors" .= object
+            [ "username" .= String "This field cannot be empty."
+            , "password_confirmation" .= String "Passwords don't match!" ]
+          , "result"       .= Null ]
+    context "when username and both password fields are filled in correctly" $
+      it "it validates and returns the correct value" $ do
+        let input = object
+              [ "username"    .= String "Bob"
+              , "password"    .= String "abc"
+              , "password_confirmation" .= String "abc" ]
+        r <- runForm signupForm input $ \SignupForm {..} -> do
+          return (FormResultSuccess ( signupUsername <> signupPassword ))
+        r `shouldBe` object
+          [ "parse_error"  .= Null
+          , "field_errors" .= object []
+          , "result"       .= String "Bobabc" ]
+    
