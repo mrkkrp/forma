@@ -377,6 +377,8 @@ field' = field @name check
 --
 -- Note that you must specify the field name on which to add a validation
 -- error message in case the check fails.
+--
+-- @since 0.2.0
 
 withCheck :: forall (name :: Symbol) (names :: [Symbol]) m e s a.
   ( KnownSymbol name
