@@ -379,8 +379,7 @@ field' = field @name check
 --
 
 withCheck :: forall (name :: Symbol) (names :: [Symbol]) m e s a.
-  (
-  KnownSymbol name
+  ( KnownSymbol name
   , InSet name names
   , Monad m
   , ToJSON e)
