@@ -69,6 +69,7 @@ module Web.Forma
   ( -- * Constructing a form
     field
   , field'
+  , withCheck
     -- * Running a form
   , runForm
   , pick
@@ -361,6 +362,45 @@ field' = field @name check
   where
     check :: a -> ExceptT () m a
     check = return
+
+-- | Transform a form by applying a checker on its result.
+--
+-- > passwordsMatch (a, b) = do
+-- >   if a == b
+-- >     then return a
+-- >     else throwError "Passwords don't match!"
+-- >
+-- > createNewPasswordForm =
+-- >   withCheck @"password_confirmation" passwordsMatch
+-- >     ((,) <$> field @"password" notEmpty
+-- >          <*> field @"password_confirmation" notEmpty)
+--
+-- Note that you must specify the field name on which to add a validation
+-- error message in case the check fails.
+
+withCheck :: forall (name :: Symbol) (names :: [Symbol]) m e s a.
+  ( KnownSymbol name
+  , InSet name names
+  , Monad m
+  , ToJSON e )
+  => (s -> ExceptT e m a) -- ^ The check to perform
+  -> FormParser names m s -- ^ Original parser
+  -> FormParser names m a -- ^ Parser with the check attached
+withCheck check (FormParser f) = FormParser $ \v -> do
+  let name = pick @name @names
+  r <- f v
+  case r of
+    Succeeded x -> do
+      res <- runExceptT (check x)
+      return $ case res of
+        Left verr ->
+          ValidationFailed (mkFieldError name verr)
+        Right y ->
+          Succeeded y
+    ValidationFailed e ->
+      return (ValidationFailed e)
+    ParsingFailed msg ->
+      return (ParsingFailed msg)
 
 ----------------------------------------------------------------------------
 -- Running a form
