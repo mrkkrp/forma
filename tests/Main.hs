@@ -14,13 +14,11 @@ import Test.Hspec
 import Web.Forma
 import qualified Data.Text as T
 
-
 notEmpty :: Monad m => Text -> ExceptT Text m Text
 notEmpty txt =
   if T.null txt
     then throwError "This field cannot be empty."
     else return txt
-
 
 type LoginFields = '["username", "password", "remember_me"]
 
@@ -44,21 +42,18 @@ data SignupForm = SignupForm
   , signupPassword :: Text
   }
 
-tupleValuesMatch :: Monad m => FieldError names -> ((Text, Text) -> ExceptT (FieldError names) m Text)
-tupleValuesMatch err (a,b) =
+passwordsMatch :: Monad m => (Text, Text) -> ExceptT Text m Text
+passwordsMatch (a,b) =
   if a == b
     then return a
-    else throwError err
+    else throwError "Passwords don't match!"
 
 signupForm :: Monad m => FormParser SignupFields m SignupForm
 signupForm = SignupForm
   <$> field @"username" notEmpty
-  <*> (addValidation
-        ((,) <$> field @"password" notEmpty <*> field @"password_confirmation" notEmpty)
-        (tupleValuesMatch (fieldError @"password_confirmation" "Passwords don't match!"))
-      )
-
-
+  <*> withCheck @"password_confirmation" passwordsMatch
+        ((,) <$> field @"password" notEmpty
+             <*> field @"password_confirmation" notEmpty)
 
 main :: IO ()
 main = hspec spec
@@ -124,9 +119,8 @@ spec = describe "Forma" $ do
             [ "username" .= String "This field cannot be empty."
             , "password" .= String "This field cannot be empty." ]
           , "result"       .= Null ]
-
   context "For addValidation being used in SignupForm example" $ do
-    context "when both password fields are empty" $ 
+    context "when both password fields are empty" $
       it "we get errors for both empty password fields" $ do
         let input = object
               [ "username"    .= String ""
@@ -167,4 +161,3 @@ spec = describe "Forma" $ do
           [ "parse_error"  .= Null
           , "field_errors" .= object []
           , "result"       .= String "Bobabc" ]
-    

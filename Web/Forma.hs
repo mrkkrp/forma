@@ -69,8 +69,7 @@ module Web.Forma
   ( -- * Constructing a form
     field
   , field'
-  , addValidation
-  , fieldError
+  , withCheck
     -- * Running a form
   , runForm
   , pick
@@ -364,53 +363,46 @@ field' = field @name check
     check :: a -> ExceptT () m a
     check = return
 
-
--- | Transform a form by applying another validator on its result.
--- 
--- You can layer checkers around sub-forms, like so:
+-- | Transform a form by applying another checker on its result.
 --
--- > tupleValuesMatch err (a, b) = do
+-- > passwordsMatch (a, b) = do
 -- >   if a == b
 -- >     then return a
--- >     else throwError err
+-- >     else throwError "Passwords don't match!"
 -- >
--- > createNewPasswordForm = 
--- >   addValidation
+-- > createNewPasswordForm =
+-- >   withCheck @"password_confirmation" passwordsMatch
 -- >     ((,) <$> field @"password" notEmpty <*> field @"password_confirmation" notEmpty)
--- >     (tupleValuesMatch (fieldError @"password_confirmation" "Passwords don't match!"))
--- 
+--
 -- Note that you must specify the (field) name on which to add a validation error message
 -- in case the check fails.
 --
-addValidation :: forall (names :: [Symbol]) m a b.
-  Monad m
-  => FormParser names m a 
-  -> (a -> ExceptT (FieldError names) m b)
-  -> FormParser names m b
-addValidation (FormParser f) check = FormParser $ \v -> do
+
+withCheck :: forall (name :: Symbol) (names :: [Symbol]) m e s a.
+  (
+  KnownSymbol name
+  , InSet name names
+  , Monad m
+  , ToJSON e)
+  => (s -> ExceptT e m a)
+  -> FormParser names m s
+  -> FormParser names m a
+withCheck check (FormParser f) = FormParser $ \v -> do
+  let name = pick @name @names
   r <- f v
   case r of
     Succeeded x -> do
       res <- runExceptT (check x)
       return $ case res of
         Left verr ->
-          ValidationFailed verr
+          ValidationFailed (mkFieldError name verr)
         Right y ->
           Succeeded y
     ValidationFailed e ->
-      return $ ValidationFailed e
+      return (ValidationFailed e)
     ParsingFailed msg ->
-      return $ ParsingFailed msg
+      return (ParsingFailed msg)
 
-fieldError :: forall (name :: Symbol) (names :: [Symbol]).
-  ( KnownSymbol name
-  , InSet name names )
-  => Text -> FieldError names
-fieldError errorText =
-  mkFieldError name errorText
-  where
-    name = pick @name @names
- 
 ----------------------------------------------------------------------------
 -- Running a form
 
