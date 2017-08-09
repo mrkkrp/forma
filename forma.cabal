@@ -1,6 +1,6 @@
 name:                 forma
 version:              0.2.0
-cabal-version:        >= 1.10
+cabal-version:        >= 1.18
 tested-with:          GHC==8.0.2, GHC==8.2.1
 license:              BSD3
 license-file:         LICENSE.md
