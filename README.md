@@ -5,7 +5,6 @@
 [![Stackage Nightly](http://stackage.org/package/forma/badge/nightly)](http://stackage.org/nightly/package/forma)
 [![Stackage LTS](http://stackage.org/package/forma/badge/lts)](http://stackage.org/lts/package/forma)
 [![Build Status](https://travis-ci.org/mrkkrp/forma.svg?branch=master)](https://travis-ci.org/mrkkrp/forma)
-[![Coverage Status](https://coveralls.io/repos/mrkkrp/forma/badge.svg?branch=master&service=github)](https://coveralls.io/github/mrkkrp/forma?branch=master)
 
 This module provides a tool for validation of forms that are represented in
 the JSON format. Sending forms in JSON format via an AJAX request instead of
