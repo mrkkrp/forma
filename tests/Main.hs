@@ -86,9 +86,9 @@ player = PlayerForm
 
 spec :: Spec
 spec = do
-  describe "field''" $ do
+  describe "value" $ do
     let text :: Monad m => FormParser n m Text
-        text = field''
+        text = value
     context "when the data is convertable" $
       it "succeeds" $ do
         let input = String "Foo"
