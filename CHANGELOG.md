@@ -1,6 +1,6 @@
 ## Forma 1.0.0
 
-* Added `subParser` and `field''` combinators. Changed signature of
+* Added `subParser` and `value` combinators. Changed signature of
   `mkFieldError` to accept `NonEmpty (SelectedName names)` as first
   argument.
 

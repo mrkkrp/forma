@@ -69,7 +69,7 @@ module Web.Forma
   ( -- * Constructing a form
     field
   , field'
-  , field''
+  , value
   , subParser
   , withCheck
     -- * Running a form
@@ -372,14 +372,14 @@ field' :: forall (name :: Symbol) (names :: [Symbol]) m a.
   , Monad m
   , FromJSON a )
   => FormParser names m a
-field' = subParser @name field''
+field' = subParser @name value
 
 -- | Interpret the current field as a value of type @a@.
 --
 -- @since 1.0.0
 
-field'' :: (Monad m , FromJSON a) => FormParser names m a
-field'' = FormParser $ \v path ->
+value :: (Monad m , FromJSON a) => FormParser names m a
+value = FormParser $ \v path ->
   case A.parseEither parseJSON v of
     Left msg -> do
       let msg' = drop 2 (dropWhile (/= ':') msg)
@@ -410,8 +410,7 @@ field'' = FormParser $ \v path ->
 subParser :: forall (name :: Symbol) (names :: [Symbol]) m a.
   ( KnownSymbol name
   , InSet name names
-  , Monad m
-  , FromJSON a )
+  , Monad m )
   => FormParser names m a -- ^ Subparser
   -> FormParser names m a -- ^ Wrapped parser
 subParser p = FormParser $ \v path -> do
