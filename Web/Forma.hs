@@ -410,8 +410,7 @@ field'' = FormParser $ \v path ->
 subParser :: forall (name :: Symbol) (names :: [Symbol]) m a.
   ( KnownSymbol name
   , InSet name names
-  , Monad m
-  , FromJSON a )
+  , Monad m )
   => FormParser names m a -- ^ Subparser
   -> FormParser names m a -- ^ Wrapped parser
 subParser p = FormParser $ \v path -> do

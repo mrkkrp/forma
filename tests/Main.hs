@@ -59,29 +59,52 @@ passwordsMatch (a,b) =
 main :: IO ()
 main = hspec spec
 
-sfield :: Monad m => FormParser LoginFields m Text
-sfield = field''
+type PlayerFields = '["name", "coords", "x", "y"]
+
+data PlayerForm = PlayerForm
+  { playerName :: String
+  , playerCoords :: CoordsForm
+  }
+
+data CoordsForm = CoordsForm
+  { coordsX :: Float
+  , coordsY :: Float
+  }
+
+instance Show CoordsForm where
+  show CoordsForm {..} = "{" ++ show coordsX ++ ", " ++ show coordsY ++ "}"
+
+coords :: Monad m => FormParser PlayerFields m CoordsForm
+coords = CoordsForm
+  <$> field' @"x"
+  <*> field' @"y"
+
+player :: Monad m => FormParser PlayerFields m PlayerForm
+player = PlayerForm
+  <$> field' @"name"
+  <*> subParser @"coords" coords
 
 spec :: Spec
 spec = do
   describe "field''" $ do
+    let text :: Monad m => FormParser n m Text
+        text = field''
     context "when the data is convertable" $
       it "succeeds" $ do
         let input = String "Foo"
-        r <- runForm sfield input finalize
+        r <- runForm text input finalize
         r `shouldBe` rSuccess input
     context "when the data is not convertable" $
       it "fails to parse" $ do
         let input = Bool True
-        r <- runForm sfield input finalize
+        r <- runForm text input finalize
         r `shouldBe` rParseError "" "expected Text, encountered Boolean"
   describe "subParser" $ do
     let p :: Monad m => FormParser LoginFields m Text
         p = withCheck @"username" notEmpty
           $ subParser @"username"
           $ subParser @"password"
-          $ subParser @"remember_me"
-            field''
+          $ field' @"remember_me"
     it "accesses fields correctly" $ do
       let txt = String "Foo"
           input = object
@@ -93,6 +116,17 @@ spec = do
             ]
       r <- runForm p input finalize
       r `shouldBe` rSuccess txt
+    it "accesses nested object correctly" $ do
+      let input = object
+            [ "name" .= String "Fanny"
+            , "coords" .= object
+              [ "x" .= (1.1 :: Float)
+              , "y" .= (25 :: Float)
+              ]
+            ]
+      r <- runForm player input $ \PlayerForm {..} ->
+        return $ FormResultSuccess (playerName ++ " at " ++ show playerCoords)
+      r `shouldBe` rSuccess (String "Fanny at {1.1, 25.0}")
     it "reports correct failure when field is missing" $ do
       let input = object
             [ "username" .= object
