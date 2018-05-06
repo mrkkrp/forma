@@ -74,15 +74,16 @@ module Web.Forma
   , withCheck
     -- * Running a form
   , runForm
+  , runForm'
   , pick
-  , unSelectedName
   , mkFieldError
     -- * Types and type functions
   , FormParser
+  , BranchState(..)
   , FormResult (..)
-  , SelectedName
+  , SelectedName(..)
   , InSet
-  , FieldError )
+  , FieldError(..) )
 where
 
 import Control.Applicative
@@ -118,7 +119,7 @@ data BranchState (names :: [Symbol]) a
     -- errors as possible.
   | Succeeded a
     -- ^ Success, we've got a result to return.
-  deriving Functor
+  deriving (Eq, Functor, Show)
 
 instance Applicative (BranchState names) where
   pure                                            = Succeeded
@@ -176,7 +177,7 @@ instance Applicative m => Alternative (FormParser names m) where
             Succeeded        _ -> x'
     in pure g <*> x v path <*> y v path
 
--- | This a type that user must return in the callback passed to the
+-- | This is a type that user must return in the callback passed to the
 -- 'runForm' function. Quite simply, it allows you either report a error or
 -- finish successfully.
 
@@ -194,8 +195,9 @@ data FormResult (names :: [Symbol]) a
 -- obtain a value of type 'SelectedName' is via the 'pick' function, which
 -- see.
 
-newtype SelectedName (names :: [Symbol])
-  = SelectedName Text
+newtype SelectedName (names :: [Symbol]) = SelectedName
+  { unSelectedName :: Text
+  }
   deriving (Eq, Ord, Show)
 
 -- | The type function computes a 'Constraint' which is satisfied when its
@@ -228,11 +230,6 @@ pick :: forall (name :: Symbol) (names :: [Symbol]).
   , InSet name names )
   => SelectedName names
 pick = (SelectedName . T.pack . symbolVal) (Proxy :: Proxy name)
-
--- | Extract a 'Text' value from 'SelectedName'.
-
-unSelectedName :: SelectedName names -> Text
-unSelectedName (SelectedName txt) = txt
 
 -- | Parse error. Non-public helper type.
 
@@ -492,24 +489,53 @@ runForm :: (Monad m, ToJSON b)
   => FormParser names m a -- ^ The form parser to run
   -> Value             -- ^ Input for the parser
   -> (a -> m (FormResult names b)) -- ^ Callback that is called on success
-  -> m Value           -- ^ The result to send back to the client
-runForm (FormParser p) v f = do
+  -> m Value          -- ^ The result to send back to the client
+runForm p v f =
+  toJSON . toResponse <$> runForm' p v f
+
+-- | Run the supplied parser on given input and call the specified callback
+-- that uses the result of parsing on success.
+--
+-- The callback can either report a 'FieldError' (one or more), or report
+-- success providing a value.
+
+runForm' :: (Monad m)
+  => FormParser names m a -- ^ The form parser to run
+  -> Value             -- ^ Input for the parser
+  -> (a -> m (FormResult names b)) -- ^ Callback that is called on success
+  -> m (BranchState names b)          -- ^ The result
+runForm' (FormParser p) v f = do
   r <- p v id
   case r of
-    ParsingFailed path msg -> return . toJSON $
-      def { responseParseError = Just (ParseError path msg) }
-    ValidationFailed validationError -> return . toJSON $
-      def { responseFieldError = pure validationError }
     Succeeded x -> do
       r' <- f x
-      return . toJSON $ case r' of
+      return $ case r' of
         FormResultError validationError ->
-          def { responseFieldError = pure validationError }
+          ValidationFailed validationError
         FormResultSuccess result ->
-          def { responseResult = toJSON result }
+          Succeeded result
+    ValidationFailed validationError ->
+      return $ ValidationFailed validationError
+    ParsingFailed path msg ->
+      return $ ParsingFailed path msg
+
 
 ----------------------------------------------------------------------------
 -- Helpers
+
+-- | Convert 'BranchState' to 'Response'.
+
+toResponse :: (ToJSON a)
+  => BranchState names a
+  -> Response names
+toResponse r =
+  case r of
+    Succeeded result ->
+      def { responseResult = toJSON result }
+    ValidationFailed validationError ->
+      def { responseFieldError = pure validationError }
+    ParsingFailed path msg ->
+      def { responseParseError = Just (ParseError path msg) }
 
 -- | Produce textual representation of path to a field.
 
