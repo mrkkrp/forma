@@ -469,9 +469,9 @@ withCheck check (FormParser f) = FormParser $ \v path -> do
 -- | Run the supplied parser on given input and call the specified callback
 -- that uses the result of parsing on success.
 --
--- The callback can either report a 'FieldError' (one or more), or report
--- success providing a value that will be converted to JSON and included in
--- the resulting 'Value' (response).
+-- The callback can either report an error with 'FormResultError', or report
+-- success providing a value in 'FormResultSuccess' that will be converted
+-- to JSON and included in the resulting 'Value' (response).
 --
 -- The resulting 'Value' has the following format:
 --
@@ -496,8 +496,8 @@ runForm p v f =
 -- | Run the supplied parser on given input and call the specified callback
 -- that uses the result of parsing on success.
 --
--- The callback can either report a 'FieldError' (one or more), or report
--- success providing a value.
+-- The callback can either report an error with 'FormResultError', or report
+-- success providing a value in 'FormResultSuccess'.
 
 runForm' :: (Monad m)
   => FormParser names m a -- ^ The form parser to run
