@@ -54,58 +54,7 @@ it's not trivial to get it right. The library allows you to:
 
 ## Example of use
 
-Here is a complete working example:
-
-```haskell
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TypeApplications  #-}
-
-module Main (main) where
-
-import Control.Monad.Except
-import Data.Aeson
-import Data.Text (Text)
-import Web.Forma
-import qualified Data.Text as T
-
-type LoginFields = '["username", "password", "remember_me"]
-
-data LoginForm = LoginForm
-  { loginUsername   :: Text
-  , loginPassword   :: Text
-  , loginRememberMe :: Bool
-  }
-
-loginForm :: Monad m => FormParser LoginFields m LoginForm
-loginForm = LoginForm
-  <$> field @"username" notEmpty
-  <*> field @"password" notEmpty
-  <*> field' @"remember_me"
-
-notEmpty :: Monad m => Text -> ExceptT Text m Text
-notEmpty txt =
-  if T.null txt
-    then throwError "This field cannot be empty."
-    else return txt
-
-myInput :: Value
-myInput = object
-  [ "username"    .= ("Bob" :: Text)
-  , "password"    .= ("123" :: Text)
-  , "remember_me" .= True
-  ]
-
-main :: IO ()
-main = do
-  r <- runForm loginForm myInput $ \LoginForm {..} -> do
-    print loginUsername
-    print loginPassword
-    print loginRememberMe
-    return (FormResultSuccess ())
-  print r
-```
+* [examples/Main.hs](examples/Main.hs)
 
 You may want to play with it a bit before writing serious code.
 

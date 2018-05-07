@@ -14,7 +14,7 @@ build-type:           Simple
 description:          Parse and validate forms in JSON format.
 extra-doc-files:      CHANGELOG.md
                     , README.md
-
+extra-source-files:   examples/Main.hs
 source-repository head
   type:               git
   location:           https://github.com/mrkkrp/forma.git
