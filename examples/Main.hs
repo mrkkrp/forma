@@ -5,15 +5,18 @@
 
 module Main (main) where
 
-import Control.Monad (forM_)
-import Control.Monad.Except
-import Data.Aeson
-import Data.List.NonEmpty (NonEmpty (..))
-import Data.Text (Text)
-import Web.Forma
-import qualified Data.Map.Strict     as M
-import qualified Data.List.NonEmpty  as NE
-import qualified Data.Text           as T
+import           Control.Monad        (forM_)
+import           Control.Monad.Except
+import           Data.Aeson
+import           Data.List.NonEmpty   (NonEmpty (..))
+import qualified Data.List.NonEmpty   as NE
+import qualified Data.Map.Strict      as M
+import           Data.Monoid          ((<>))
+import           Data.String          (fromString)
+import           Data.Text            (Text)
+import qualified Data.Text            as T
+import qualified Data.Text.IO         as T
+import           Web.Forma
 
 type LoginFields = '["username", "password", "remember_me"]
 
@@ -56,19 +59,19 @@ main = do
     print loginPassword
     print loginRememberMe
     return $ FormResultSuccess $ String "Success"
-  print $ show r ++ "\n"
+  print $ toJSON (toResponse r)
 
   -- success
-  r' <- runForm' loginForm myInput $ return . FormResultSuccess
+  r' <- runForm loginForm myInput $ return . FormResultSuccess
   printResult r'
 
   -- parsing error
-  r'' <- runForm' loginForm invalidInput $ return . FormResultSuccess
+  r'' <- runForm loginForm invalidInput $ return . FormResultSuccess
   printResult r''
 
   -- validation error
-  r''' <- runForm' loginForm myInput $ \LoginForm {..} -> do
-    let msg = String "I don't like this username."
+  r''' <- runForm loginForm myInput $ \LoginForm {..} -> do
+    let msg = String "I don't like this username"
         e = mkFieldError (nes $ pick @"username" @LoginFields) msg
     return $ FormResultError e
   printResult (r''' :: BranchState LoginFields Text)
@@ -76,17 +79,18 @@ main = do
 printResult :: Show a => BranchState names a -> IO ()
 printResult r =
   case r of
-    ParsingFailed paths err ->
-      forM_ paths $ \path ->
-        print $ "Parse error: " ++ err ++ " at " ++ show (unSelectedName path)
+    ParsingFailed path err ->
+      T.putStrLn $ "Parse error: " <> err <> " at " <> showFieldPath path
     ValidationFailed (FieldError errs) ->
       forM_ (M.toAscList errs) $ \(path, err) ->
-        print $ "Validation error: " ++ show err  ++ " at " ++ show (showFieldPath (NE.toList path))
-    Succeeded result ->
-      print $ "Success: " ++ show result
+        T.putStrLn $ "Validation error: " <> showErr err <> " at " <>
+          showFieldPath (NE.toList path)
+      where showErr err = case err of
+              String e -> e
+              _ -> fromString $ show err
+    Succeeded result -> do
+      T.putStr "Success: "
+      print result
 
 nes :: a -> NonEmpty a
 nes x = x :| []
-
-showFieldPath :: [SelectedName names] -> Text
-showFieldPath = T.intercalate "." . fmap unSelectedName

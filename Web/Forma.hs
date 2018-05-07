@@ -74,9 +74,11 @@ module Web.Forma
   , withCheck
     -- * Running a form
   , runForm
-  , runForm'
   , pick
   , mkFieldError
+    -- * Helpers
+  , toResponse
+  , showFieldPath
     -- * Types and type functions
   , FormParser
   , BranchState(..)
@@ -95,6 +97,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map.Strict (Map)
 import Data.Proxy
 import Data.Semigroup (Semigroup (..))
+import Data.String (fromString)
 import Data.Text (Text)
 import GHC.TypeLits
 import qualified Data.Aeson.Types    as A
@@ -109,7 +112,7 @@ import qualified Data.Text           as T
 -- | State of a parsing branch.
 
 data BranchState (names :: [Symbol]) a
-  = ParsingFailed [SelectedName names] String
+  = ParsingFailed [SelectedName names] Text
     -- ^ Parsing of JSON failed, this is fatal, we shut down and report the
     -- parsing error. The first component specifies path to a problematic
     -- field and the second component is the text of error message.
@@ -234,7 +237,7 @@ pick = (SelectedName . T.pack . symbolVal) (Proxy :: Proxy name)
 -- | Parse error. Non-public helper type.
 
 data ParseError (names :: [Symbol])
-  = ParseError [SelectedName names] String
+  = ParseError [SelectedName names] Text
   deriving (Eq, Show)
 
 instance ToJSON (ParseError names) where
@@ -380,7 +383,7 @@ value = FormParser $ \v path ->
   case A.parseEither parseJSON v of
     Left msg -> do
       let msg' = drop 2 (dropWhile (/= ':') msg)
-      return (ParsingFailed (path []) msg')
+      return (ParsingFailed (path []) $ fromString msg')
     Right x -> return (Succeeded x)
 
 -- | Use a given parser to parse a field. Suppose that you have a parser
@@ -417,7 +420,7 @@ subParser p = FormParser $ \v path -> do
   case A.parseEither f v of
     Left msg -> do
       let msg' = drop 2 (dropWhile (/= ':') msg)
-      return (ParsingFailed (path' []) msg')
+      return (ParsingFailed (path' []) $ fromString msg')
     Right v' ->
       unFormParser p v' path'
 
@@ -470,41 +473,14 @@ withCheck check (FormParser f) = FormParser $ \v path -> do
 -- that uses the result of parsing on success.
 --
 -- The callback can either report an error with 'FormResultError', or report
--- success providing a value in 'FormResultSuccess' that will be converted
--- to JSON and included in the resulting 'Value' (response).
---
--- The resulting 'Value' has the following format:
---
--- > {
--- >   "parse_error": "Text or null."
--- >   "field_errors":
--- >     {
--- >       "foo": "Foo's error serialized to JSON.",
--- >       "bar": "Bar's error…"
--- >     }
--- >   "result": "What you return from the callback in FormResultSuccess."
--- > }
-
-runForm :: (Monad m, ToJSON b)
-  => FormParser names m a -- ^ The form parser to run
-  -> Value             -- ^ Input for the parser
-  -> (a -> m (FormResult names b)) -- ^ Callback that is called on success
-  -> m Value          -- ^ The result to send back to the client
-runForm p v f =
-  toJSON . toResponse <$> runForm' p v f
-
--- | Run the supplied parser on given input and call the specified callback
--- that uses the result of parsing on success.
---
--- The callback can either report an error with 'FormResultError', or report
 -- success providing a value in 'FormResultSuccess'.
 
-runForm' :: (Monad m)
+runForm :: (Monad m)
   => FormParser names m a -- ^ The form parser to run
   -> Value             -- ^ Input for the parser
   -> (a -> m (FormResult names b)) -- ^ Callback that is called on success
   -> m (BranchState names b)          -- ^ The result
-runForm' (FormParser p) v f = do
+runForm (FormParser p) v f = do
   r <- p v id
   case r of
     Succeeded x -> do
@@ -524,6 +500,18 @@ runForm' (FormParser p) v f = do
 -- Helpers
 
 -- | Convert 'BranchState' to 'Response'.
+--
+-- 'Response' converted with `toJSON` to 'Value' has the following format:
+--
+-- > {
+-- >   "parse_error": "Text or null."
+-- >   "field_errors":
+-- >     {
+-- >       "foo": "Foo's error serialized to JSON.",
+-- >       "bar": "Bar's error…"
+-- >     }
+-- >   "result": "What you return from the callback in FormResultSuccess."
+-- > }
 
 toResponse :: (ToJSON a)
   => BranchState names a

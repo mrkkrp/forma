@@ -14,7 +14,7 @@ import Data.Semigroup ((<>))
 import Data.Text (Text)
 import Test.Hspec
 import Web.Forma
-import qualified Data.Text as T
+import qualified Data.Text           as T
 
 type LoginFields = '["username", "password", "remember_me"]
 
@@ -30,10 +30,13 @@ loginForm = LoginForm
   <*> field @"password" notEmpty
   <*> (empty <|> field' @"remember_me" <|> pure True)
 
+fieldEmptyMsg :: Text
+fieldEmptyMsg = "This field cannot be empty."
+
 notEmpty :: Monad m => Text -> ExceptT Text m Text
 notEmpty txt =
   if T.null txt
-    then throwError "This field cannot be empty."
+    then throwError fieldEmptyMsg
     else return txt
 
 type SignupFields = '["username", "password", "password_confirmation"]
@@ -50,11 +53,14 @@ signupForm = SignupForm
         ((,) <$> field @"password" notEmpty
              <*> field @"password_confirmation" notEmpty)
 
+passwordsDontMatchMsg :: Text
+passwordsDontMatchMsg = "Passwords don't match!"
+
 passwordsMatch :: Monad m => (Text, Text) -> ExceptT Text m Text
 passwordsMatch (a,b) =
   if a == b
     then return a
-    else throwError "Passwords don't match!"
+    else throwError passwordsDontMatchMsg
 
 main :: IO ()
 main = hspec spec
@@ -93,12 +99,14 @@ spec = do
       it "succeeds" $ do
         let input = String "Foo"
         r <- runForm text input finalize
-        r `shouldBe` rSuccess input
+        toJSON (toResponse r) `shouldBe` rSuccess input
     context "when the data is not convertable" $
       it "fails to parse" $ do
         let input = Bool True
         r <- runForm text input finalize
-        r `shouldBe` rParseError "" "expected Text, encountered Boolean"
+        toJSON (toResponse r) `shouldBe` rParseError
+          "" "expected Text, encountered Boolean"
+
   describe "subParser" $ do
     let p :: Monad m => FormParser LoginFields m Text
         p = withCheck @"username" notEmpty
@@ -106,16 +114,16 @@ spec = do
           $ subParser @"password"
           $ field' @"remember_me"
     it "accesses fields correctly" $ do
-      let txt = String "Foo"
+      let txt = "Foo"
           input = object
             [ "username" .= object
               [ "password" .= object
-                [ "remember_me" .= txt
+                [ "remember_me" .= String txt
                 ]
               ]
             ]
       r <- runForm p input finalize
-      r `shouldBe` rSuccess txt
+      r `shouldBe` Succeeded txt
     it "accesses nested object correctly" $ do
       let input = object
             [ "name" .= String "Fanny"
@@ -126,7 +134,7 @@ spec = do
             ]
       r <- runForm player input $ \PlayerForm {..} ->
         return $ FormResultSuccess (playerName ++ " at " ++ show playerCoords)
-      r `shouldBe` rSuccess (String "Fanny at {1.1, 25.0}")
+      r `shouldBe` Succeeded "Fanny at {1.1, 25.0}"
     it "reports correct failure when field is missing" $ do
       let input = object
             [ "username" .= object
@@ -134,8 +142,9 @@ spec = do
               ]
             ]
       r <- runForm p input finalize
-      r `shouldBe` rParseError "username.password.remember_me"
-                               "key \"remember_me\" not present"
+      r `shouldBe` ParsingFailed
+                    [ pick @"username" , pick @"password" , pick @"remember_me"]
+                    "key \"remember_me\" not present"
     it "reports correct field path on parse failure" $ do
       let input = object
             [ "username" .= object
@@ -145,8 +154,9 @@ spec = do
               ]
             ]
       r <- runForm p input finalize
-      r `shouldBe` rParseError "username.password.remember_me"
-                               "expected Text, encountered Boolean"
+      r `shouldBe` ParsingFailed
+                    [ pick @"username" , pick @"password" , pick @"remember_me"]
+                    "expected Text, encountered Boolean"
     it "reports correct field path on validation failure" $ do
       let input = object
             [ "username" .= object
@@ -156,7 +166,9 @@ spec = do
               ]
             ]
       r <- runForm p input finalize
-      r `shouldBe` rFieldErrors [("username", "This field cannot be empty.")]
+      r `shouldBe` ValidationFailed (mkFieldError (nes $ pick @"username") $
+                      String fieldEmptyMsg)
+
   describe "Forma (older test suite)" $ do
     context "when a parse error happens" $
       it "it's reported immediately" $ do
@@ -166,13 +178,8 @@ spec = do
               , "remember_me" .= True ]
         r <- runForm loginForm input $ \_ ->
           return (FormResultSuccess ())
-        r `shouldBe` object
-          [ "parse_error"  .= object
-            [ "field" .= ("username" :: Text)
-            , "message" .= ("expected Text, encountered Number" :: Text)
-            ]
-          , "field_errors" .= object []
-          , "result"       .= Null ]
+        r `shouldBe` ParsingFailed
+                      [ pick @"username" ] "expected Text, encountered Number"
     context "when no parse error happens" $ do
       context "when no validation errors happen in 1 step" $ do
         context "when callback reports success" $
@@ -183,10 +190,7 @@ spec = do
             r <- runForm loginForm input $ \LoginForm {..} -> do
               loginRememberMe `shouldBe` True
               return (FormResultSuccess (loginUsername <> loginPassword))
-            r `shouldBe` object
-              [ "parse_error"  .= Null
-              , "field_errors" .= object []
-              , "result"       .= String "Bob123" ]
+            r `shouldBe` Succeeded "Bob123"
         context "when callback reports validation errors" $
           it "correct resulting value is returned" $ do
             let input = object
@@ -200,12 +204,9 @@ spec = do
               let e0 = mkFieldError (nes $ pick @"username" @LoginFields) msg0
                   e1 = mkFieldError (nes $ pick @"password" @LoginFields) msg1
               return (FormResultError (e0 <> e1) :: FormResult LoginFields ())
-            r `shouldBe` object
-              [ "parse_error"  .= Null
-              , "field_errors" .= object
-                [ "username" .= msg0
-                , "password" .= msg1 ]
-              , "result"     .= Null ]
+            r `shouldBe` ValidationFailed
+               (mkFieldError (nes $ pick @"username") (String msg0)
+               <> mkFieldError (nes $ pick @"password") (String msg1))
       context "when validation errors happen in 1 step" $
         it "all of them are reported" $ do
           let input = object
@@ -214,12 +215,9 @@ spec = do
                 , "remember_me" .= True ]
           r <- runForm loginForm input $ \_ ->
             return (FormResultSuccess ())
-          r `shouldBe` object
-            [ "parse_error"  .= Null
-            , "field_errors" .= object
-              [ "username" .= String "This field cannot be empty."
-              , "password" .= String "This field cannot be empty." ]
-            , "result"       .= Null ]
+          r `shouldBe` ValidationFailed
+              (mkFieldError (nes $ pick @"username") (String fieldEmptyMsg)
+              <> mkFieldError (nes $ pick @"password") (String fieldEmptyMsg))
     context "for withCheck being used in SignupForm example" $ do
       context "when both password fields are empty" $
         it "we get errors for both empty password fields" $ do
@@ -229,13 +227,10 @@ spec = do
                 , "password_confirmation" .= String "" ]
           r <- runForm signupForm input $ \_ ->
             return (FormResultSuccess ())
-          r `shouldBe` object
-            [ "parse_error"  .= Null
-            , "field_errors" .= object
-              [ "username" .= String "This field cannot be empty."
-              , "password" .= String "This field cannot be empty."
-              , "password_confirmation" .= String "This field cannot be empty." ]
-            , "result"       .= Null ]
+          r `shouldBe` ValidationFailed
+              (mkFieldError (nes $ pick @"username") (String fieldEmptyMsg)
+              <> mkFieldError (nes $ pick @"password") (String fieldEmptyMsg)
+              <> mkFieldError (nes $ pick @"password_confirmation") (String fieldEmptyMsg))
       context "when both password fields contain values that don't match" $
         it "the validation added with withCheck reports that passwords don't match" $ do
           let input = object
@@ -244,12 +239,9 @@ spec = do
                 , "password_confirmation" .= String "def" ]
           r <- runForm signupForm input $ \_ ->
             return (FormResultSuccess ())
-          r `shouldBe` object
-            [ "parse_error"  .= Null
-            , "field_errors" .= object
-              [ "username" .= String "This field cannot be empty."
-              , "password_confirmation" .= String "Passwords don't match!" ]
-            , "result"       .= Null ]
+          r `shouldBe` ValidationFailed
+              (mkFieldError (nes $ pick @"username") (String fieldEmptyMsg)
+              <> mkFieldError (nes $ pick @"password_confirmation") (String passwordsDontMatchMsg))
       context "when username and both password fields are filled in correctly" $
         it "it validates and returns the correct value" $ do
           let input = object
@@ -258,10 +250,7 @@ spec = do
                 , "password_confirmation" .= String "abc" ]
           r <- runForm signupForm input $ \SignupForm {..} ->
             return (FormResultSuccess ( signupUsername <> signupPassword ))
-          r `shouldBe` object
-            [ "parse_error"  .= Null
-            , "field_errors" .= object []
-            , "result"       .= String "Bobabc" ]
+          r `shouldBe` Succeeded "Bobabc"
 
 ----------------------------------------------------------------------------
 -- Helpers
@@ -275,15 +264,6 @@ rParseError fld msg = object
   , "field_errors" .= object []
   , "result" .= Null
   ]
-
-rFieldErrors :: [(Text, Text)] -> Value
-rFieldErrors xs = object
-  [ "parse_error" .= Null
-  , "field_errors" .= object (fmap f xs)
-  , "result" .= Null
-  ]
-  where
-    f (x, y) = x .= y
 
 rSuccess :: Value -> Value
 rSuccess r = object
