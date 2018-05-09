@@ -4,6 +4,10 @@
   `mkFieldError` to accept `NonEmpty (SelectedName names)` as first
   argument.
 
+* Improved typing, thus changing signature of `runForm` and introducing an
+  additional type variable to the `FieldError` data type to reflect type of
+  validation errors.
+
 ## Forma 0.2.0
 
 * Added `withCheck`.

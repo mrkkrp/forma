@@ -23,8 +23,8 @@ The task of validation of a form in the JSON format may seem simple, but
 it's not trivial to get it right. The library allows you to:
 
 * Define form parser using type-safe applicative notation with field labels
-  being stored on the type label which excludes any possibility of typos and
-  will force all your field labels be always up to date.
+  being stored on the type label which guards against typos and will force
+  all your field labels be always up to date.
 
 * Parse JSON `Value` according to the definition of form you created.
 
@@ -78,7 +78,7 @@ data LoginForm = LoginForm
   , loginRememberMe :: Bool
   }
 
-loginForm :: Monad m => FormParser LoginFields m LoginForm
+loginForm :: Monad m => FormParser LoginFields Text m LoginForm
 loginForm = LoginForm
   <$> field @"username" notEmpty
   <*> field @"password" notEmpty
@@ -103,7 +103,7 @@ main = do
     print loginUsername
     print loginPassword
     print loginRememberMe
-    return (FormResultSuccess ())
+    return (Right ())
   print r
 ```
 

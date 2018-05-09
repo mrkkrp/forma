@@ -22,9 +22,8 @@
 -- it's not trivial to get it right. The library allows you to:
 --
 --     * Define form parser using type-safe applicative notation with field
---       labels being stored on the type label which excludes any
---       possibility of typos and will force all your field labels be always
---       up to date.
+--       labels being stored on the type label which guards against typos
+--       and will force all your field labels be always up to date.
 --     * Parse JSON 'Value' according to the definition of form you created.
 --     * Stop parsing immediately if given form is malformed and cannot be
 --       processed.
@@ -57,8 +56,8 @@
 {-# LANGUAGE DeriveFunctor        #-}
 {-# LANGUAGE ExplicitForAll       #-}
 {-# LANGUAGE KindSignatures       #-}
+{-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
@@ -88,7 +87,6 @@ where
 import Control.Applicative
 import Control.Monad.Except
 import Data.Aeson
-import Data.Default.Class
 import Data.Kind
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map.Strict (Map)
@@ -105,22 +103,51 @@ import qualified Data.Text           as T
 ----------------------------------------------------------------------------
 -- Types
 
--- | State of a parsing branch.
+-- | Result of parsing. @names@ is the collection of allowed field names,
+-- @e@ is the type of validation errors, and @a@ is the type of parsing
+-- result.
+--
+-- @since 1.0.0
 
-data BranchState (names :: [Symbol]) a
+data FormResult (names :: [Symbol]) e a
   = ParsingFailed [SelectedName names] String
     -- ^ Parsing of JSON failed, this is fatal, we shut down and report the
     -- parsing error. The first component specifies path to a problematic
     -- field and the second component is the text of error message.
-  | ValidationFailed (FieldError names)
+  | ValidationFailed (FieldError names e)
     -- ^ Validation of a field failed. This is also fatal but we still try
     -- to validate other branches (fields) to collect as many validation
     -- errors as possible.
   | Succeeded a
     -- ^ Success, we've got a result to return.
-  deriving Functor
+  deriving (Eq, Show, Functor)
 
-instance Applicative (BranchState names) where
+instance (ToJSON e, ToJSON a) => ToJSON (FormResult names e a) where
+  toJSON = \case
+    ParsingFailed path msg ->
+      f (Just (path, msg)) Nothing Nothing
+    ValidationFailed verr ->
+      f Nothing (Just verr) Nothing
+    Succeeded x ->
+      f Nothing Nothing (Just x)
+    where
+      f :: Maybe ([SelectedName names], String)
+        -> Maybe (FieldError names e)
+        -> Maybe a
+        -> Value
+      f perr verr result = object
+        [ "parse_error" .=
+          case perr of
+            Nothing -> Null
+            Just (path, msg) -> object
+              [ "field"   .= showFieldPath path
+              , "message" .= msg
+              ]
+        , "field_errors" .= maybe (Object HM.empty) toJSON verr
+        , "result" .= result
+        ]
+
+instance Applicative (FormResult names e) where
   pure                                            = Succeeded
   (ParsingFailed l msg) <*> _                     = ParsingFailed l msg
   (ValidationFailed _)  <*> (ParsingFailed l msg) = ParsingFailed l msg
@@ -135,10 +162,11 @@ instance Applicative (BranchState names) where
 -- parser is via the 'field' function. Users can combine existing parsers
 -- using the applicative notation.
 --
--- 'FormParser' is parametrized by three type variables:
+-- 'FormParser' is parametrized by four type variables:
 --
 --     * @names@—collection of field names we can use in a form to be parsed
 --       with this parser.
+--     * @e@—type of validation errors.
 --     * @m@—underlying monad, 'FormParser' is not a monad itself, so it's
 --       not a monad transformer, but validation can make use of the @m@
 --       monad.
@@ -148,24 +176,24 @@ instance Applicative (BranchState names) where
 -- instance with the properties that we want (validation errors should not
 -- lead to short-cutting behavior).
 
-newtype FormParser (names :: [Symbol]) m a = FormParser
+newtype FormParser (names :: [Symbol]) e m a = FormParser
   { unFormParser
       :: Value
       -> ([SelectedName names] -> [SelectedName names])
-      -> m (BranchState names a)
+      -> m (FormResult names e a)
   }
 
-instance Functor m => Functor (FormParser names m) where
+instance Functor m => Functor (FormParser names e m) where
   fmap f (FormParser x) = FormParser $ \v path ->
     fmap (fmap f) (x v path)
 
-instance Applicative m => Applicative (FormParser names m) where
+instance Applicative m => Applicative (FormParser names e m) where
   pure x = FormParser $ \_ _ ->
     pure (Succeeded x)
   (FormParser f) <*> (FormParser x) = FormParser $ \v path ->
     pure (<*>) <*> f v path <*> x v path
 
-instance Applicative m => Alternative (FormParser names m) where
+instance Applicative m => Alternative (FormParser names e m) where
   empty = FormParser $ \_ path ->
     pure (ParsingFailed (path []) "empty")
   (FormParser x) <|> (FormParser y) = FormParser $ \v path ->
@@ -175,17 +203,6 @@ instance Applicative m => Alternative (FormParser names m) where
             ValidationFailed _ -> x'
             Succeeded        _ -> x'
     in pure g <*> x v path <*> y v path
-
--- | This a type that user must return in the callback passed to the
--- 'runForm' function. Quite simply, it allows you either report a error or
--- finish successfully.
-
-data FormResult (names :: [Symbol]) a
-  = FormResultError (FieldError names)
-    -- ^ Form submission failed, here are the validation errors.
-  | FormResultSuccess a
-    -- ^ Form submission succeeded, send this info.
-  deriving (Eq, Show)
 
 -- | @'SelectedName' names@ represents a name ('Text' value) that is
 -- guaranteed to be in the @names@, which is a set of strings on type level.
@@ -234,32 +251,20 @@ pick = (SelectedName . T.pack . symbolVal) (Proxy :: Proxy name)
 unSelectedName :: SelectedName names -> Text
 unSelectedName (SelectedName txt) = txt
 
--- | Parse error. Non-public helper type.
-
-data ParseError (names :: [Symbol])
-  = ParseError [SelectedName names] String
-  deriving (Eq, Show)
-
-instance ToJSON (ParseError names) where
-  toJSON (ParseError path msg) = object
-    [ "field"   .= showFieldPath path
-    , "message" .= msg
-    ]
-
 -- | Error info in JSON format associated with a particular form field.
 -- Parametrized by @names@, which is a collection of field names (on type
 -- level) the target field belongs to. 'FieldError' is an instance of
 -- 'Semigroup' and that's how you combine values of that type. Note that
 -- it's not a 'Monoid', because we do not want to allow empty 'FieldError's.
 
-newtype FieldError (names :: [Symbol])
-  = FieldError (Map (NonEmpty (SelectedName names)) Value)
+newtype FieldError (names :: [Symbol]) e
+  = FieldError (Map (NonEmpty (SelectedName names)) e)
   deriving (Eq, Show)
 
-instance Semigroup (FieldError names) where
+instance Semigroup (FieldError names e) where
   (FieldError x) <> (FieldError y) = FieldError (M.union x y)
 
-instance ToJSON (FieldError names) where
+instance ToJSON e => ToJSON (FieldError names e) where
   toJSON (FieldError m) = (object . fmap f . M.toAscList) m
     where
       f (path, err) = showFieldPath (NE.toList path) .= err
@@ -271,7 +276,7 @@ instance ToJSON (FieldError names) where
 --
 -- > type Fields = '["foo", "bar", "baz"]
 -- >
--- > myError :: FieldError Fields
+-- > myError :: FieldError Fields Text
 -- > myError = mkFieldError (pick @"foo" @Fields) "That's all wrong."
 --
 -- See also: 'pick' (to create 'SelectedName').
@@ -279,32 +284,11 @@ instance ToJSON (FieldError names) where
 -- __Note__: type of the first argument has been changed in the version
 -- /1.0.0/.
 
-mkFieldError :: ToJSON e
-  => NonEmpty (SelectedName names) -- ^ The path to problematic field
+mkFieldError
+  :: NonEmpty (SelectedName names) -- ^ The path to problematic field
   -> e                 -- ^ Data that represents error
-  -> FieldError names
-mkFieldError path x =
-  FieldError (M.singleton path (toJSON x))
-
--- | An internal type of response that we covert to 'Value' before returning
--- it.
-
-data Response (names :: [Symbol]) = Response
-  { responseParseError :: Maybe (ParseError names)
-  , responseFieldError :: Maybe (FieldError names)
-  , responseResult     :: Value }
-
-instance Default (Response names) where
-  def = Response
-    { responseParseError = Nothing
-    , responseFieldError = Nothing
-    , responseResult     = Null }
-
-instance ToJSON (Response names) where
-  toJSON Response {..} = object
-    [ "parse_error"  .= responseParseError
-    , "field_errors" .= maybe (Object HM.empty) toJSON responseFieldError
-    , "result"       .= responseResult ]
+  -> FieldError names e
+mkFieldError path x = FieldError (M.singleton path x)
 
 ----------------------------------------------------------------------------
 -- Constructing a form
@@ -320,7 +304,7 @@ instance ToJSON (Response names) where
 -- >   , loginRememberMe :: Bool
 -- >   }
 -- >
--- > loginForm :: Monad m => FormParser LoginFields m LoginForm
+-- > loginForm :: Monad m => FormParser LoginFields Text m LoginForm
 -- > loginForm = LoginForm
 -- >   <$> field @"username" notEmpty
 -- >   <*> field @"password" notEmpty
@@ -352,33 +336,32 @@ instance ToJSON (Response names) where
 --
 -- To run a form composed from 'field's, see 'runForm'.
 
-field :: forall (name :: Symbol) (names :: [Symbol]) m e s a.
+field :: forall (name :: Symbol) (names :: [Symbol]) e m a s.
   ( KnownSymbol name
   , InSet name names
   , Monad m
-  , ToJSON e
   , FromJSON s )
   => (s -> ExceptT e m a)
      -- ^ Checker that performs validation and possibly transformation of
      -- the field value
-  -> FormParser names m a
+  -> FormParser names e m a
 field check = withCheck @name check (field' @name)
 
 -- | The same as 'field', but does not require a checker.
 
-field' :: forall (name :: Symbol) (names :: [Symbol]) m a.
+field' :: forall (name :: Symbol) (names :: [Symbol]) e m a.
   ( KnownSymbol name
   , InSet name names
   , Monad m
   , FromJSON a )
-  => FormParser names m a
+  => FormParser names e m a
 field' = subParser @name value
 
 -- | Interpret the current field as a value of type @a@.
 --
 -- @since 1.0.0
 
-value :: (Monad m , FromJSON a) => FormParser names m a
+value :: (Monad m , FromJSON a) => FormParser names e m a
 value = FormParser $ \v path ->
   case A.parseEither parseJSON v of
     Left msg -> do
@@ -407,12 +390,12 @@ value = FormParser $ \v path ->
 --
 -- @since 1.0.0
 
-subParser :: forall (name :: Symbol) (names :: [Symbol]) m a.
+subParser :: forall (name :: Symbol) (names :: [Symbol]) e m a.
   ( KnownSymbol name
   , InSet name names
   , Monad m )
-  => FormParser names m a -- ^ Subparser
-  -> FormParser names m a -- ^ Wrapped parser
+  => FormParser names e m a -- ^ Subparser
+  -> FormParser names e m a -- ^ Wrapped parser
 subParser p = FormParser $ \v path -> do
   let name = pick @name @names
       f = withObject "form field" (.: unSelectedName name)
@@ -441,14 +424,13 @@ subParser p = FormParser $ \v path -> do
 --
 -- @since 0.2.0
 
-withCheck :: forall (name :: Symbol) (names :: [Symbol]) m e s a.
+withCheck :: forall (name :: Symbol) (names :: [Symbol]) e m a s.
   ( KnownSymbol name
   , InSet name names
-  , Monad m
-  , ToJSON e )
+  , Monad m )
   => (s -> ExceptT e m a) -- ^ The check to perform
-  -> FormParser names m s -- ^ Original parser
-  -> FormParser names m a -- ^ Parser with the check attached
+  -> FormParser names e m s -- ^ Original parser
+  -> FormParser names e m a -- ^ Parser with the check attached
 withCheck check (FormParser f) = FormParser $ \v path -> do
   let name = pick @name @names
   r <- f v path
@@ -473,40 +455,31 @@ withCheck check (FormParser f) = FormParser $ \v path -> do
 -- that uses the result of parsing on success.
 --
 -- The callback can either report a 'FieldError' (one or more), or report
--- success providing a value that will be converted to JSON and included in
--- the resulting 'Value' (response).
+-- success providing a result value.
 --
--- The resulting 'Value' has the following format:
---
--- > {
--- >   "parse_error": "Text or null."
--- >   "field_errors":
--- >     {
--- >       "foo": "Foo's error serialized to JSON.",
--- >       "bar": "Bar's error…"
--- >     }
--- >   "result": "What you return from the callback in FormResultSuccess."
--- > }
+-- __Note__: type of the function has been changed in the version /1.0.0/.
 
-runForm :: (Monad m, ToJSON b)
-  => FormParser names m a -- ^ The form parser to run
-  -> Value             -- ^ Input for the parser
-  -> (a -> m (FormResult names b)) -- ^ Callback that is called on success
-  -> m Value           -- ^ The result to send back to the client
+runForm :: Monad m
+  => FormParser names e m a
+     -- ^ The form parser to run
+  -> Value
+     -- ^ Input for the parser
+  -> (a -> m (Either (FieldError names e) b))
+     -- ^ Callback that is called on success
+  -> m (FormResult names e b)
+     -- ^ The result of parsing
 runForm (FormParser p) v f = do
   r <- p v id
   case r of
-    ParsingFailed path msg -> return . toJSON $
-      def { responseParseError = Just (ParseError path msg) }
-    ValidationFailed validationError -> return . toJSON $
-      def { responseFieldError = pure validationError }
+    ParsingFailed path msg ->
+      return (ParsingFailed path msg)
+    ValidationFailed verr ->
+      return (ValidationFailed verr)
     Succeeded x -> do
       r' <- f x
-      return . toJSON $ case r' of
-        FormResultError validationError ->
-          def { responseFieldError = pure validationError }
-        FormResultSuccess result ->
-          def { responseResult = toJSON result }
+      return $ case r' of
+        Left verr -> ValidationFailed verr
+        Right result -> Succeeded result
 
 ----------------------------------------------------------------------------
 -- Helpers
