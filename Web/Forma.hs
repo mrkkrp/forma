@@ -76,6 +76,7 @@ module Web.Forma
   , pick
   , unSelectedName
   , mkFieldError
+  , unFieldError
     -- * Types and type functions
   , FormParser
   , FormResult (..)
@@ -289,6 +290,15 @@ mkFieldError
   -> e                 -- ^ Data that represents error
   -> FieldError names e
 mkFieldError path x = FieldError (M.singleton path x)
+
+-- | Extract internal map from a 'FieldError'.
+--
+-- @since 1.0.0
+
+unFieldError
+  :: FieldError names e
+  -> Map (NonEmpty (SelectedName names)) e
+unFieldError (FieldError m) = m
 
 ----------------------------------------------------------------------------
 -- Constructing a form

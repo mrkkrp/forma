@@ -8,6 +8,8 @@
   additional type variable to the `FieldError` data type to reflect type of
   validation errors.
 
+* Added `unFieldError`.
+
 ## Forma 0.2.0
 
 * Added `withCheck`.
