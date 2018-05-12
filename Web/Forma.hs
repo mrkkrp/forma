@@ -86,6 +86,7 @@ module Web.Forma
 where
 
 import Control.Applicative
+import Control.Arrow (second)
 import Control.Monad.Except
 import Data.Aeson
 import Data.Kind
@@ -139,11 +140,8 @@ instance (ToJSON e, ToJSON a) => ToJSON (FormResult names e a) where
       f perr verr result = object
         [ "parse_error" .=
           case perr of
-            Nothing -> Null
-            Just (path, msg) -> object
-              [ "field"   .= showFieldPath path
-              , "message" .= msg
-              ]
+            Nothing          -> Null
+            Just (path, msg) -> fieldPathToJSON path (String $ T.pack msg)
         , "field_errors" .= maybe (Object HM.empty) toJSON verr
         , "result" .= result
         ]
@@ -266,9 +264,8 @@ instance Semigroup (FieldError names e) where
   (FieldError x) <> (FieldError y) = FieldError (M.union x y)
 
 instance ToJSON e => ToJSON (FieldError names e) where
-  toJSON (FieldError m) = (object . fmap f . M.toAscList) m
-    where
-      f (path, err) = showFieldPath (NE.toList path) .= err
+  toJSON (FieldError m) =
+    concatObjects $ uncurry fieldPathToJSON . second toJSON <$> M.toAscList m
 
 -- | This is a smart constructor for the 'FieldError' type, and the only way
 -- to obtain values of that type.
@@ -494,7 +491,22 @@ runForm (FormParser p) v f = do
 ----------------------------------------------------------------------------
 -- Helpers
 
--- | Produce textual representation of path to a field.
+-- | Concatenate JSON objects on their keys.
+-- All the given values are expected to be 'Object'.
 
-showFieldPath :: [SelectedName names] -> Text
-showFieldPath = T.intercalate "." . fmap unSelectedName
+concatObjects :: [Value] -> Value
+concatObjects =
+  Object . foldr (HM.unionWith concatValues . (\(Object x) -> x)) HM.empty
+
+-- | Concatenate JSON objects\' values.
+
+concatValues :: Value -> Value -> Value
+concatValues (Object o1) (Object o2)  = Object $ HM.unionWith concatValues o1 o2
+concatValues _           o@(Object _) = o
+concatValues o           _            = o
+
+-- | Unroll the field path to JSON that mimics the structure of the input.
+
+fieldPathToJSON :: Foldable t => t (SelectedName names) -> Value -> Value
+fieldPathToJSON =
+  flip $ foldr (\next acc -> object [unSelectedName next .= acc])

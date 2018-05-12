@@ -66,10 +66,7 @@ spec = do
       let r :: FormResult LoginFields Text Text
           r = ParsingFailed [] "Foo baz."
       toJSON r `shouldBe` object
-        [ "parse_error" .= object
-          [ "field" .= ("" :: Text)
-          , "message" .= ("Foo baz." :: Text)
-          ]
+        [ "parse_error" .= ("Foo baz." :: Text)
         , "field_errors" .= object []
         , "result" .= Null
         ]
@@ -78,8 +75,7 @@ spec = do
           r = ParsingFailed [pick @"username"] "Foo foo."
       toJSON r `shouldBe` object
         [ "parse_error" .= object
-          [ "field" .= ("username" :: Text)
-          , "message" .= ("Foo foo." :: Text)
+          [ "username" .= ("Foo foo." :: Text)
           ]
         , "field_errors" .= object []
         , "result" .= Null
@@ -93,13 +89,16 @@ spec = do
             ] "Foo bar."
       toJSON r `shouldBe` object
         [ "parse_error" .= object
-          [ "field" .= ("username.password.remember_me" :: Text)
-          , "message" .= ("Foo bar." :: Text)
+          [ "username" .= object
+            [ "password" .= object
+              [ "remember_me" .= ("Foo bar." :: Text)
+              ]
+            ]
           ]
         , "field_errors" .= object []
         , "result" .= Null
         ]
-    it "ValidationFailed" $ do
+    it "ValidationFailed (1)" $ do
       let r :: FormResult LoginFields Text Text
           r = ValidationFailed e
           e = mkFieldError (nes $ pick @"username" @LoginFields) msg
@@ -108,6 +107,38 @@ spec = do
         [ "parse_error" .= Null
         , "field_errors" .= object
           [ "username" .= ("Something" :: Text)
+          ]
+        , "result" .= Null
+        ]
+    it "ValidationFailed (2)" $ do
+      let r :: FormResult LoginFields Text Text
+          r = ValidationFailed (e0 <> e1)
+          e0 = mkFieldError (pick @"username" :| [pick @"password"]) msg
+          e1 = mkFieldError (pick @"username" :| [pick @"remember_me"]) msg
+          msg = "Something" :: Text
+      toJSON r `shouldBe` object
+        [ "parse_error" .= Null
+        , "field_errors" .= object
+          [ "username" .= object
+            [ "password" .= ("Something" :: Text)
+            , "remember_me" .= ("Something" :: Text)
+            ]
+          ]
+        , "result" .= Null
+        ]
+    it "ValidationFailed (3)" $ do
+      let r :: FormResult LoginFields Text Text
+          r = ValidationFailed (e0 <> e1)
+          e0 = mkFieldError (nes $ pick @"username") msg
+          e1 = mkFieldError (pick @"username" :| [pick @"remember_me"]) msg
+          msg = "Something" :: Text
+      toJSON r `shouldBe` object
+        [ "parse_error" .= Null
+        , "field_errors" .= object
+          [ "username" .= object
+            -- the validation error at deeper level `e1` has precedence
+            [ "remember_me" .= ("Something" :: Text)
+            ]
           ]
         , "result" .= Null
         ]
