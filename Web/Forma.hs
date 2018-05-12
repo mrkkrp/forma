@@ -492,11 +492,13 @@ runForm (FormParser p) v f = do
 -- Helpers
 
 -- | Concatenate JSON objects on their keys.
--- All the given values are expected to be 'Object'.
 
 concatObjects :: [Value] -> Value
 concatObjects =
-  Object . foldr (HM.unionWith concatValues . (\(Object x) -> x)) HM.empty
+  Object . foldr (HM.unionWith concatValues . unwrap) HM.empty
+  where
+    unwrap (Object o) = o
+    unwrap _          = HM.empty
 
 -- | Concatenate JSON objects\' values.
 
