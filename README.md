@@ -43,14 +43,11 @@ it's not trivial to get it right. The library allows you to:
   errors at the same time.
 
 * Use `optional` and `(<|>)` from `Control.Applicative` in your form
-  definitions instead of ugly ad-hoc stuff (yes `digestive-functors`, I'm
-  looking at you).
+  definitions instead of ugly ad-hoc stuff.
 
-* When individual validation of fields is done, you get a chance to perform
-  some actions and either decide that form submission has succeeded, or
-  indeed perform additional checks that may depend on several form fields at
-  once and signal a validation error assigned to a specific field(s). This
-  constitute the “second level” of validation, so to speak.
+* Perform validation using several form fields at once. You choose which
+  “sub-region” of your form a given check will have access to, see
+  `withCheck`.
 
 ## Example of use
 
@@ -58,9 +55,8 @@ Here is a complete working example:
 
 ```haskell
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TypeApplications  #-}
 
 module Main (main) where
 
@@ -76,13 +72,13 @@ data LoginForm = LoginForm
   { loginUsername   :: Text
   , loginPassword   :: Text
   , loginRememberMe :: Bool
-  }
+  } deriving (Show)
 
 loginForm :: Monad m => FormParser LoginFields Text m LoginForm
 loginForm = LoginForm
-  <$> field @"username" notEmpty
-  <*> field @"password" notEmpty
-  <*> field' @"remember_me"
+  <$> field #username notEmpty
+  <*> field #password notEmpty
+  <*> field' #remember_me
 
 notEmpty :: Monad m => Text -> ExceptT Text m Text
 notEmpty txt =
@@ -98,13 +94,7 @@ myInput = object
   ]
 
 main :: IO ()
-main = do
-  r <- runForm loginForm myInput $ \LoginForm {..} -> do
-    print loginUsername
-    print loginPassword
-    print loginRememberMe
-    return (Right ())
-  print r
+main = runForm loginForm myInput >>= print
 ```
 
 You may want to play with it a bit before writing serious code.
