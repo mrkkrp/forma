@@ -46,8 +46,6 @@
 --       to a specific field(s). This constitute the “second level” of
 --       validation, so to speak.
 --
--- __This library requires at least GHC 8 to work.__
---
 -- You need to enable at least @DataKinds@ and @TypeApplications@ language
 -- extensions to use this library.
 
@@ -339,7 +337,7 @@ unFieldError (FieldError m) = m
 -- > }
 --
 -- Once value of type @s@ is extracted, validation phase beings. The
--- supplied checker (you can easy compose them with @('>=>')@, as they are
+-- supplied checker (you can easily compose them with @('>=>')@, as they are
 -- Kleisli arrows) is applied to the @s@ value and validation either
 -- succeeds producing an @a@ value, or we collect an error in the form of a
 -- value of @e@ type, which is fed into 'mkFieldError' internally.
