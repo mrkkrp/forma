@@ -55,7 +55,7 @@ Here is a complete working example:
 
 ```haskell
 {-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedLabels  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main (main) where
