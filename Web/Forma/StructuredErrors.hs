@@ -8,8 +8,8 @@
 -- Portability :  portable
 --
 -- This module provides a wrapper newtype around 'FormResult' that formats
--- errors reported from running a form in an alternative style. In this style
--- the structure of errors mimics the structure of the input.
+-- errors to JSON in an alternative style, in which the structure of errors
+-- mimics the structure of the input.
 --
 -- Module "Web.Forma" is re-exported, so you can easily use this module as a drop-in
 -- replacement.
