@@ -72,6 +72,7 @@ module Web.Forma
   , withCheck
     -- * Running a form\/inspecting result
   , runForm
+  , runFormPure
   , unFieldName
   , showFieldName
     -- * Types and type functions
@@ -84,6 +85,7 @@ where
 import Control.Applicative
 import Control.Monad.Except
 import Data.Aeson
+import Data.Functor.Identity (Identity (..))
 import Data.Kind
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map.Strict (Map)
@@ -421,6 +423,19 @@ runForm :: Monad m
   -> m (FormResult names e a)
      -- ^ The result of parsing
 runForm (FormParser p) v = p v (Option Nothing)
+
+-- | Run form purely.
+--
+-- @since 1.1.0
+
+runFormPure
+  :: FormParser names e Identity a
+     -- ^ The form parser to run
+  -> Value
+     -- ^ Input for the parser
+  -> FormResult names e a
+     -- ^ The result of parsing
+runFormPure p v = runIdentity (runForm p v)
 
 ----------------------------------------------------------------------------
 -- Helpers
