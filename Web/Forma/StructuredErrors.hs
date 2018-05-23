@@ -20,13 +20,19 @@
 
 module Web.Forma.StructuredErrors
   ( module Web.Forma
-  , runForm'
+    -- * Wrapper type
   , StructuredErrors (..)
+    -- * Running a form
+  , runForm'
+    -- * JSON Conversions
+  , parsingFailed
+  , validationFailed
   )
 where
 
 import Control.Arrow (first, second)
 import Data.Aeson
+import Data.Map.Strict (Map)
 import Data.Text (Text)
 import GHC.TypeLits
 import Web.Forma
@@ -95,15 +101,9 @@ newtype StructuredErrors (names :: [Symbol]) e a =
 instance (ToJSON e, ToJSON a) => ToJSON (StructuredErrors names e a) where
   toJSON (StructuredErrors formResult) =
     case formResult of
-      ParsingFailed path msg ->
-        maybe val (flip fieldPathToJSON val . unFieldName) path
-        where val = String msg
-      ValidationFailed err ->
-        concatObjects $
-          uncurry fieldPathToJSON . first unFieldName . second toJSON <$>
-            M.toAscList err
-      Succeeded x ->
-        toJSON x
+      ParsingFailed path msg -> parsingFailed path msg
+      ValidationFailed verr  -> validationFailed verr
+      Succeeded x            -> toJSON x
 
 -- | Run a parser on given input that returns 'FormResult' wrapped in
 -- 'StructuredErrors'.
@@ -116,6 +116,28 @@ runForm' :: Monad m
   -> m (StructuredErrors names e a)
      -- ^ The result of parsing
 runForm' f v = StructuredErrors <$> runForm f v
+
+----------------------------------------------------------------------------
+-- JSON Conversions
+
+-- | Convert 'ParsingFailed' data to a JSON 'Value'.
+--
+-- This function is used by 'StructuredErrors' in its 'ToJSON' instance.
+
+parsingFailed :: Maybe (FieldName names) -> Text -> Value
+parsingFailed path msg =
+  maybe val (flip fieldPathToJSON val . unFieldName) path
+  where val = String msg
+
+-- | Convert 'ValidationFailed' data to a JSON 'Value'.
+--
+-- This function is used by 'StructuredErrors' in its 'ToJSON' instance.
+
+validationFailed :: (ToJSON e) => Map (FieldName names) e -> Value
+validationFailed verr =
+  concatObjects $
+    uncurry fieldPathToJSON . first unFieldName . second toJSON <$>
+      M.toAscList verr
 
 ----------------------------------------------------------------------------
 -- Helpers
