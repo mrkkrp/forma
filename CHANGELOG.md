@@ -1,3 +1,7 @@
+## Forma 1.1.0
+
+* Added `runFormPure`.
+
 ## Forma 1.0.0
 
 * The library has been completely redesigned and rewritten.
