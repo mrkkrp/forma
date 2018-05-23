@@ -11,6 +11,7 @@ import Data.Semigroup ((<>))
 import Data.Text (Text)
 import Test.Hspec
 import Web.Forma
+import Web.Forma.StructuredErrors
 import qualified Data.Map.Strict as M
 import qualified Data.Text       as T
 
@@ -245,3 +246,50 @@ spec = do
             { signupUsername = "Bob"
             , signupPassword = "abc"
             }
+  describe "Web.Forma.StructuredErrors" $ do
+    it "ParsingFailed case (1)" $ do
+      let r :: StructuredErrors LoginFields Text Text
+          r = StructuredErrors $ ParsingFailed Nothing "Foo baz."
+      toJSON r `shouldBe` toJSON ("Foo baz." :: Text)
+    it "ParsingFailed case (2)" $ do
+      let r :: StructuredErrors LoginFields Text Text
+          r = StructuredErrors $ ParsingFailed (pure #username) "Foo foo."
+      toJSON r `shouldBe` object
+        [ "username" .= ("Foo foo." :: Text)
+        ]
+    it "ParsingFailed case (3)" $ do
+      let r :: StructuredErrors LoginFields Text Text
+          r = StructuredErrors $ ParsingFailed
+                (pure (#username <> #password <> #remember_me)) "Foo bar."
+      toJSON r `shouldBe` object
+        [ "username" .= object
+          [ "password" .= object
+            [ "remember_me" .= ("Foo bar." :: Text)
+            ]
+          ]
+        ]
+    it "ValidationFailed (1)" $ do
+      let r :: StructuredErrors LoginFields Text Text
+          r = StructuredErrors $ ValidationFailed (M.singleton #username msg)
+          msg = "Something" :: Text
+      toJSON r `shouldBe` object
+        [ "username" .= ("Something" :: Text)
+        ]
+    it "ValidationFailed (2)" $ do
+      let r :: StructuredErrors LoginFields Text Text
+          r = StructuredErrors $ ValidationFailed (M.fromList
+                                                   [ (#username, msg0)
+                                                   , (#username <> #password, msg1)
+                                                   ]
+                                                  )
+          msg0 = "Something" :: Text
+          msg1 = "Invalid" :: Text
+      toJSON r `shouldBe` object
+        [ "username" .= object
+          [ "password" .= msg1
+          ]
+        ]
+    it "Succeeded" $ do
+      let r :: StructuredErrors LoginFields Text Text
+          r = StructuredErrors $ Succeeded "Yeah"
+      toJSON r `shouldBe` toJSON ("Yeah" :: Text)
