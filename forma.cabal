@@ -25,7 +25,7 @@ flag dev
   default:            False
 
 library
-  build-depends:      aeson            >= 0.9 && < 1.4
+  build-depends:      aeson            >= 0.9 && < 1.5
                     , base             >= 4.9 && < 5.0
                     , containers       >= 0.5 && < 0.6
                     , mtl              >= 2.0 && < 3.0
@@ -48,7 +48,7 @@ test-suite tests
   main-is:            Main.hs
   hs-source-dirs:     tests
   type:               exitcode-stdio-1.0
-  build-depends:      aeson            >= 0.9 && < 1.4
+  build-depends:      aeson            >= 0.9 && < 1.5
                     , base             >= 4.9 && < 5.0
                     , containers       >= 0.5 && < 0.6
                     , forma
