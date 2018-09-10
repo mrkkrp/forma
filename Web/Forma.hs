@@ -440,7 +440,7 @@ runFormPure p v = runIdentity (runForm p v)
 ----------------------------------------------------------------------------
 -- Helpers
 
--- | Fixup a error message returned by Aeson.
+-- | Fixup an error message returned by Aeson.
 
 fixupAesonError :: String -> Text
 fixupAesonError msg = T.pack (drop 2 (dropWhile (/= ':') msg))
