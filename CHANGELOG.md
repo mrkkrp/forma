@@ -1,3 +1,9 @@
+## Forma 1.1.1
+
+* Fixed a bug which caused `withCheck` (and functions using it such as
+  `field`) report incorrect location of element for which validation fails
+  when it's nested in `subParser` wrappers.
+
 ## Forma 1.1.0
 
 * Added `runFormPure`.

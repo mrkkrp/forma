@@ -89,8 +89,8 @@ import Data.Functor.Identity (Identity (..))
 import Data.Kind
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map.Strict (Map)
+import Data.Maybe (fromMaybe)
 import Data.Proxy
-import Data.Semigroup
 import Data.Text (Text)
 import GHC.OverloadedLabels (IsLabel (..))
 import GHC.TypeLits
@@ -99,6 +99,10 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.List.NonEmpty  as NE
 import qualified Data.Map.Strict     as M
 import qualified Data.Text           as T
+
+#if !MIN_VERSION_base(4,11,0)
+import Data.Semigroup
+#endif
 
 ----------------------------------------------------------------------------
 -- Types
@@ -179,7 +183,7 @@ instance Applicative (FormResult names e) where
 newtype FormParser (names :: [Symbol]) e m a = FormParser
   { unFormParser
       :: Value
-      -> Option (FieldName names)
+      -> Maybe (FieldName names)
       -> m (FormResult names e a)
   }
 
@@ -330,7 +334,7 @@ value :: (Monad m , FromJSON a) => FormParser names e m a
 value = FormParser $ \v path ->
   case A.parseEither parseJSON v of
     Left msg -> return $
-      ParsingFailed (getOption path) (fixupAesonError msg)
+      ParsingFailed path (fixupAesonError msg)
     Right x -> return (Succeeded x)
 
 -- | Use a given parser to parse a field. Suppose that you have a parser
@@ -359,11 +363,11 @@ subParser :: forall (names :: [Symbol]) e m a.
   -> FormParser names e m a -- ^ Wrapped parser
 subParser fieldName p = FormParser $ \v path -> do
   let f = withObject "form field" (.: showFieldName fieldName)
-      path' = path <> Option (Just fieldName)
+      path' = path <> Just fieldName
   case A.parseEither f v of
     Left msg -> do
       let msg' = fixupAesonError msg
-      return (ParsingFailed (getOption path') msg')
+      return (ParsingFailed path' msg')
     Right v' ->
       unFormParser p v' path'
 
@@ -401,8 +405,9 @@ withCheck fieldName check (FormParser f) = FormParser $ \v path -> do
     Succeeded x -> do
       res <- runExceptT (check x)
       return $ case res of
-        Left verr ->
-          ValidationFailed (M.singleton (fromOption fieldName path) verr)
+        Left verr -> do
+          let path' = path <> Just fieldName
+          ValidationFailed (M.singleton (fromMaybe fieldName path') verr)
         Right y ->
           Succeeded y
     ValidationFailed e ->
@@ -422,7 +427,7 @@ runForm :: Monad m
      -- ^ Input for the parser
   -> m (FormResult names e a)
      -- ^ The result of parsing
-runForm (FormParser p) v = p v (Option Nothing)
+runForm (FormParser p) v = p v Nothing
 
 -- | Run form purely.
 --
@@ -444,8 +449,3 @@ runFormPure p v = runIdentity (runForm p v)
 
 fixupAesonError :: String -> Text
 fixupAesonError msg = T.pack (drop 2 (dropWhile (/= ':') msg))
-
--- | Like 'Data.Maybe.fromMaybe' but for 'Option'.
-
-fromOption :: a -> Option a -> a
-fromOption x = option x id
