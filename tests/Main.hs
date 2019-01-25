@@ -174,6 +174,34 @@ spec = do
           msg = "This field cannot be empty."
       r <- runForm p input
       r `shouldBe` ValidationFailed (M.singleton #username msg)
+  describe "withCheck" $ do
+    let p :: Monad m => FormParser LoginFields Text m Text
+        p = subParser #username
+          $ subParser #password
+          $ field #remember_me notEmpty
+    it "reports correct path and error when parsing fails" $ do
+      let input = object
+            [ "username" .= object
+              [ "password" .= object
+                [ "remember_me" .= Bool False
+                ]
+              ]
+            ]
+      r <- runForm p input
+      r `shouldBe` ParsingFailed (pure (#username <> #password <> #remember_me))
+                                 "expected Text, encountered Boolean"
+    it "reports correct path and error when validation fails" $ do
+      let input = object
+            [ "username" .= object
+              [ "password" .= object
+                [ "remember_me" .= String ""
+                ]
+              ]
+            ]
+          msg = "This field cannot be empty."
+      r <- runForm p input
+      r `shouldBe` ValidationFailed
+        (M.singleton (#username <> #password <> #remember_me) msg)
   describe "Forma (older test suite)" $ do
     context "when a parse error happens" $
       it "it's reported immediately" $ do
