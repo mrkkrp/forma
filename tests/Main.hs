@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedLabels  #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -125,7 +126,12 @@ spec = do
       it "fails to parse" $ do
         let input = Bool True
         r <- runForm text input
-        r `shouldBe` ParsingFailed Nothing "expected Text, encountered Boolean"
+        r `shouldBe` ParsingFailed Nothing
+#if MIN_VERSION_aeson(1,4,3)
+          "parsing Text failed, expected String, but encountered Boolean"
+#else
+          "expected Text, encountered Boolean"
+#endif
   describe "subParser" $ do
     let p :: Monad m => FormParser LoginFields Text m Text
         p = withCheck #username notEmpty
@@ -162,7 +168,11 @@ spec = do
             ]
       r <- runForm p input
       r `shouldBe` ParsingFailed (pure (#username <> #password <> #remember_me))
-                                 "expected Text, encountered Boolean"
+#if MIN_VERSION_aeson(1,4,3)
+        "parsing Text failed, expected String, but encountered Boolean"
+#else
+        "expected Text, encountered Boolean"
+#endif
     it "reports correct field path on validation failure" $ do
       let input = object
             [ "username" .= object
@@ -189,7 +199,11 @@ spec = do
             ]
       r <- runForm p input
       r `shouldBe` ParsingFailed (pure (#username <> #password <> #remember_me))
-                                 "expected Text, encountered Boolean"
+#if MIN_VERSION_aeson(1,4,3)
+        "parsing Text failed, expected String, but encountered Boolean"
+#else
+        "expected Text, encountered Boolean"
+#endif
     it "reports correct path and error when validation fails" $ do
       let input = object
             [ "username" .= object
@@ -211,7 +225,11 @@ spec = do
               , "remember_me" .= True ]
         r <- runForm loginForm input
         r `shouldBe` ParsingFailed (pure #username)
+#if MIN_VERSION_aeson(1,4,3)
+          "parsing Text failed, expected String, but encountered Number"
+#else
           "expected Text, encountered Number"
+#endif
     context "when no parse error happens" $ do
       context "when validation errors happen" $
         it "all of them are reported" $ do
