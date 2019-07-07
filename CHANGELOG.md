@@ -1,3 +1,7 @@
+## Unreleased
+
+* Dropped support for GHC 8.0.
+
 ## Forma 1.1.2
 
 * Fixed the test suite so it passes with `aeson-1.4.3.0`.
