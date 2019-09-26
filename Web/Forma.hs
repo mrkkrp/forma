@@ -48,7 +48,6 @@
 -- __Note__: version /1.0.0/ is completely different from older versions.
 
 {-# LANGUAGE AllowAmbiguousTypes   #-}
-{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE ExplicitForAll        #-}
@@ -99,10 +98,6 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.List.NonEmpty  as NE
 import qualified Data.Map.Strict     as M
 import qualified Data.Text           as T
-
-#if !MIN_VERSION_base(4,11,0)
-import Data.Semigroup
-#endif
 
 ----------------------------------------------------------------------------
 -- Types
@@ -224,12 +219,8 @@ newtype FieldName (names :: [Symbol])
 
 instance (KnownSymbol name, InSet name names)
   => IsLabel (name :: Symbol) (FieldName names) where
-#if MIN_VERSION_base(4,10,0)
   fromLabel =
-#else
-  fromLabel _ =
-#endif
-      (FieldName . nes . T.pack . symbolVal) (Proxy :: Proxy name)
+    (FieldName . nes . T.pack . symbolVal) (Proxy :: Proxy name)
     where
       nes x = x :| []
 

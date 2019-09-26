@@ -8,12 +8,15 @@ module Main (main) where
 import Control.Applicative
 import Control.Monad.Except
 import Data.Aeson
-import Data.Semigroup ((<>))
 import Data.Text (Text)
 import Test.Hspec
 import Web.Forma
 import qualified Data.Map.Strict as M
 import qualified Data.Text       as T
+
+#if !MIN_VERSION_base(4,13,0)
+import Data.Semigroup ((<>))
+#endif
 
 type LoginFields = '["username", "password", "remember_me"]
 
