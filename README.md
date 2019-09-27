@@ -104,7 +104,7 @@ You may want to play with it a bit before writing serious code.
 Issues, bugs, and questions may be reported in [the GitHub issue tracker for
 this project](https://github.com/mrkkrp/forma/issues).
 
-Pull requests are also welcome and will be reviewed quickly.
+Pull requests are also welcome.
 
 ## License
 
