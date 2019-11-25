@@ -1,4 +1,6 @@
-## Unreleased
+## Forma 1.1.3
+
+* Test suite passes with `aeson-1.4.6.0`.
 
 * Dropped support for GHC 8.2 and older.
 
