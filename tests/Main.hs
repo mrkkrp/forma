@@ -160,7 +160,11 @@ spec = do
             ]
       r <- runForm p input
       r `shouldBe` ParsingFailed (pure (#username <> #password <> #remember_me))
+#if MIN_VERSION_aeson(1,4,6)
+                                 "key \"remember_me\" not found"
+#else
                                  "key \"remember_me\" not present"
+#endif
     it "reports correct field path on parse failure" $ do
       let input = object
             [ "username" .= object
