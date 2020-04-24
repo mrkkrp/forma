@@ -54,8 +54,8 @@ it's not trivial to get it right. The library allows you to:
 Here is a complete working example:
 
 ```haskell
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedLabels  #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main (main) where
@@ -63,22 +63,24 @@ module Main (main) where
 import Control.Monad.Except
 import Data.Aeson
 import Data.Text (Text)
-import Web.Forma
 import qualified Data.Text as T
+import Web.Forma
 
 type LoginFields = '["username", "password", "remember_me"]
 
 data LoginForm = LoginForm
-  { loginUsername   :: Text
-  , loginPassword   :: Text
-  , loginRememberMe :: Bool
-  } deriving (Show)
+  { loginUsername :: Text,
+    loginPassword :: Text,
+    loginRememberMe :: Bool
+  }
+  deriving (Show)
 
 loginForm :: Monad m => FormParser LoginFields Text m LoginForm
-loginForm = LoginForm
-  <$> field #username notEmpty
-  <*> field #password notEmpty
-  <*> field' #remember_me
+loginForm =
+  LoginForm
+    <$> field #username notEmpty
+    <*> field #password notEmpty
+    <*> field' #remember_me
 
 notEmpty :: Monad m => Text -> ExceptT Text m Text
 notEmpty txt =
@@ -87,11 +89,12 @@ notEmpty txt =
     else return txt
 
 myInput :: Value
-myInput = object
-  [ "username"    .= ("Bob" :: Text)
-  , "password"    .= ("123" :: Text)
-  , "remember_me" .= True
-  ]
+myInput =
+  object
+    [ "username" .= ("Bob" :: Text),
+      "password" .= ("123" :: Text),
+      "remember_me" .= True
+    ]
 
 main :: IO ()
 main = runForm loginForm myInput >>= print
