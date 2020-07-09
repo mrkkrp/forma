@@ -4,7 +4,7 @@
 [![Hackage](https://img.shields.io/hackage/v/forma.svg?style=flat)](https://hackage.haskell.org/package/forma)
 [![Stackage Nightly](http://stackage.org/package/forma/badge/nightly)](http://stackage.org/nightly/package/forma)
 [![Stackage LTS](http://stackage.org/package/forma/badge/lts)](http://stackage.org/lts/package/forma)
-[![Build Status](https://travis-ci.org/mrkkrp/forma.svg?branch=master)](https://travis-ci.org/mrkkrp/forma)
+![CI](https://github.com/mrkkrp/forma/workflows/CI/badge.svg?branch=master)
 
 This module provides a tool for validation of forms that are represented in
 the JSON format. Sending forms in JSON format via an AJAX request instead of
