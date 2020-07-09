@@ -138,15 +138,13 @@ spec = do
   describe "value" $ do
     let text :: Monad m => FormParser names Text m Text
         text = value
-    context "when the data is convertable"
-      $ it "succeeds"
-      $ do
+    context "when the data is convertable" $
+      it "succeeds" $ do
         let input = "Foo"
         r <- runForm text (String input)
         r `shouldBe` Succeeded input
-    context "when the data is not convertable"
-      $ it "fails to parse"
-      $ do
+    context "when the data is not convertable" $
+      it "fails to parse" $ do
         let input = Bool True
         r <- runForm text input
         r `shouldBe` ParsingFailed Nothing
@@ -158,10 +156,10 @@ spec = do
   describe "subParser" $ do
     let p :: Monad m => FormParser LoginFields Text m Text
         p =
-          withCheck #username notEmpty
-            $ subParser #username
-            $ subParser #password
-            $ field' #remember_me
+          withCheck #username notEmpty $
+            subParser #username $
+              subParser #password $
+                field' #remember_me
     it "accesses fields correctly" $ do
       let txt = "Foo"
           input =
@@ -226,9 +224,9 @@ spec = do
   describe "withCheck" $ do
     let p :: Monad m => FormParser LoginFields Text m Text
         p =
-          subParser #username
-            $ subParser #password
-            $ field #remember_me notEmpty
+          subParser #username $
+            subParser #password $
+              field #remember_me notEmpty
     it "reports correct path and error when parsing fails" $ do
       let input =
             object
@@ -264,9 +262,8 @@ spec = do
         `shouldBe` ValidationFailed
           (M.singleton (#username <> #password <> #remember_me) msg)
   describe "Forma (older test suite)" $ do
-    context "when a parse error happens"
-      $ it "it's reported immediately"
-      $ do
+    context "when a parse error happens" $
+      it "it's reported immediately" $ do
         let input =
               object
                 [ "username" .= (1 :: Int),
@@ -281,9 +278,8 @@ spec = do
           "expected Text, encountered Number"
 #endif
     context "when no parse error happens" $ do
-      context "when validation errors happen"
-        $ it "all of them are reported"
-        $ do
+      context "when validation errors happen" $
+        it "all of them are reported" $ do
           let input =
                 object
                   [ "username" .= String "",
@@ -299,9 +295,8 @@ spec = do
                     (#password, msg)
                   ]
               )
-      context "when no validation errors happens"
-        $ it "the parsing succeeds"
-        $ do
+      context "when no validation errors happens" $
+        it "the parsing succeeds" $ do
           let input =
                 object
                   [ "username" .= String "foo",
@@ -317,9 +312,8 @@ spec = do
                   loginRememberMe = True
                 }
     context "for withCheck being used in SignupForm example" $ do
-      context "when both password fields are empty"
-        $ it "we get errors for both empty password fields"
-        $ do
+      context "when both password fields are empty" $
+        it "we get errors for both empty password fields" $ do
           let input =
                 object
                   [ "username" .= String "",
@@ -336,9 +330,8 @@ spec = do
                     (#password_confirmation, msg)
                   ]
               )
-      context "when both password fields contain values that don't match"
-        $ it "the validation added with withCheck reports that passwords don't match"
-        $ do
+      context "when both password fields contain values that don't match" $
+        it "the validation added with withCheck reports that passwords don't match" $ do
           let input =
                 object
                   [ "username" .= String "",
@@ -353,9 +346,8 @@ spec = do
                     (#password_confirmation, "Passwords don't match!")
                   ]
               )
-      context "when username and both password fields are filled in correctly"
-        $ it "it validates and returns the correct value"
-        $ do
+      context "when username and both password fields are filled in correctly" $
+        it "it validates and returns the correct value" $ do
           let input =
                 object
                   [ "username" .= String "Bob",
