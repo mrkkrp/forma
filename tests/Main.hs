@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -13,10 +12,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Test.Hspec
 import Web.Forma
-
-#if !MIN_VERSION_base(4,13,0)
-import Data.Semigroup ((<>))
-#endif
 
 type LoginFields = '["username", "password", "remember_me"]
 
@@ -147,12 +142,10 @@ spec = do
       it "fails to parse" $ do
         let input = Bool True
         r <- runForm text input
-        r `shouldBe` ParsingFailed Nothing
-#if MIN_VERSION_aeson(1,4,3)
-          "parsing Text failed, expected String, but encountered Boolean"
-#else
-          "expected Text, encountered Boolean"
-#endif
+        r
+          `shouldBe` ParsingFailed
+            Nothing
+            "parsing Text failed, expected String, but encountered Boolean"
   describe "subParser" $ do
     let p :: Monad m => FormParser LoginFields Text m Text
         p =
@@ -183,12 +176,10 @@ spec = do
                     ]
               ]
       r <- runForm p input
-      r `shouldBe` ParsingFailed (pure (#username <> #password <> #remember_me))
-#if MIN_VERSION_aeson(1,4,6)
-                                 "key \"remember_me\" not found"
-#else
-                                 "key \"remember_me\" not present"
-#endif
+      r
+        `shouldBe` ParsingFailed
+          (pure (#username <> #password <> #remember_me))
+          "key \"remember_me\" not found"
     it "reports correct field path on parse failure" $ do
       let input =
             object
@@ -201,12 +192,10 @@ spec = do
                     ]
               ]
       r <- runForm p input
-      r `shouldBe` ParsingFailed (pure (#username <> #password <> #remember_me))
-#if MIN_VERSION_aeson(1,4,3)
-        "parsing Text failed, expected String, but encountered Boolean"
-#else
-        "expected Text, encountered Boolean"
-#endif
+      r
+        `shouldBe` ParsingFailed
+          (pure (#username <> #password <> #remember_me))
+          "parsing Text failed, expected String, but encountered Boolean"
     it "reports correct field path on validation failure" $ do
       let input =
             object
@@ -239,12 +228,10 @@ spec = do
                     ]
               ]
       r <- runForm p input
-      r `shouldBe` ParsingFailed (pure (#username <> #password <> #remember_me))
-#if MIN_VERSION_aeson(1,4,3)
-        "parsing Text failed, expected String, but encountered Boolean"
-#else
-        "expected Text, encountered Boolean"
-#endif
+      r
+        `shouldBe` ParsingFailed
+          (pure (#username <> #password <> #remember_me))
+          "parsing Text failed, expected String, but encountered Boolean"
     it "reports correct path and error when validation fails" $ do
       let input =
             object
@@ -271,12 +258,10 @@ spec = do
                   "remember_me" .= True
                 ]
         r <- runForm loginForm input
-        r `shouldBe` ParsingFailed (pure #username)
-#if MIN_VERSION_aeson(1,4,3)
-          "parsing Text failed, expected String, but encountered Number"
-#else
-          "expected Text, encountered Number"
-#endif
+        r
+          `shouldBe` ParsingFailed
+            (pure #username)
+            "parsing Text failed, expected String, but encountered Number"
     context "when no parse error happens" $ do
       context "when validation errors happen" $
         it "all of them are reported" $ do
