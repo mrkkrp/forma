@@ -56,7 +56,7 @@ test-suite tests
         aeson >=1.4.6 && <1.6,
         base >=4.13 && <5.0,
         containers >=0.5 && <0.7,
-        forma -any,
+        forma,
         hspec >=2.0 && <3.0,
         mtl >=2.0 && <3.0,
         text >=0.2 && <1.3
