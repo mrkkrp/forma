@@ -6,44 +6,41 @@
 [![Stackage LTS](http://stackage.org/package/forma/badge/lts)](http://stackage.org/lts/package/forma)
 ![CI](https://github.com/mrkkrp/forma/workflows/CI/badge.svg?branch=master)
 
-This module provides a tool for validation of forms that are represented in
-the JSON format. Sending forms in JSON format via an AJAX request instead of
-traditional submitting of forms has a number of advantages:
+This library provides a tool for validation of forms in the JSON format.
+Sending forms in the JSON format via an AJAX request instead of traditional
+submitting of forms has a number of advantages:
 
 * Smoother user experience: no need to reload the whole page.
 
 * Form rendering is separated and lives only in GET handler, POST (or
   whatever method you deem appropriate for your use case) handler only
-  handles validation and actual effects that form submission should
-  initiate.
+  handles validation and effects that form submission should initiate.
 
-* You get a chance to organize form input just like you want.
+* You get a chance to organize form input the way you want.
 
 The task of validation of a form in the JSON format may seem simple, but
 it's not trivial to get it right. The library allows you to:
 
-* Define form parser using type-safe applicative notation with field labels
-  being stored on the type label which guards against typos and will force
-  all your field labels be always up to date.
+* Define a form parser using type-safe applicative notation with field
+  labels stored on the type label which guards against typos and will force
+  all your field labels to be always up to date.
 
 * Parse JSON `Value` according to the definition of form you created.
 
-* Stop parsing immediately if given form is malformed and cannot be
-  processed.
+* Stop parsing immediately if a form is malformed and cannot be processed.
 
-* Validate forms using any number of *composable* checkers that you write
-  for your specific problem domain. Once you have a vocabulary of checkers,
-  creation of new forms is just a matter of combining them, and yes they do
-  combine nicely.
+* Validate forms using any number of composable checkers that you write for
+  your specific problem domain. Once you have a vocabulary of checkers,
+  creation of new forms is just a matter of combining them.
 
-* Collect validation errors from multiple branches of parsing (one branch
-  per form field) in parallel, so validation errors in one branch do not
+* Collect validation errors from multiple branches of parsing (a branch per
+  form field) in parallel, so that validation errors in one branch do not
   prevent us from collecting validation errors from other branches. This
-  allows for a better user experience as the user can see all validation
+  allows for better user experience as the user can see all validation
   errors at the same time.
 
 * Use `optional` and `(<|>)` from `Control.Applicative` in your form
-  definitions instead of ugly ad-hoc stuff.
+  definitions instead of ad-hoc helpers.
 
 * Perform validation using several form fields at once. You choose which
   “sub-region” of your form a given check will have access to, see

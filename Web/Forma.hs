@@ -22,37 +22,37 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- This module provides a tool for validation of forms that are represented
--- in the JSON format. Sending forms in JSON format via an AJAX request
--- instead of traditional submitting of forms has a number of advantages:
+-- This module provides a tool for validation of forms in the JSON format.
+-- Sending forms in the JSON format via an AJAX request instead of
+-- traditional submitting of forms has a number of advantages:
 --
 --     * Smoother user experience: no need to reload the whole page.
 --     * Form rendering is separated and lives only in GET handler, POST (or
 --       whatever method you deem appropriate for your use case) handler
---       only handles validation and actual effects that form submission
---       should initiate.
---     * You get a chance to organize form input just like you want.
+--       only handles validation and effects that form submission should
+--       initiate.
+--     * You get a chance to organize form input the way you want.
 --
 -- The task of validation of a form in the JSON format may seem simple, but
 -- it's not trivial to get it right. The library allows you to:
 --
---     * Define form parser using type-safe applicative notation with field
---       labels being stored on the type label which guards against typos
+--     * Define a form parser using type-safe applicative notation with field
+--       labels stored on the type label which guards against typos
 --       and will force all your field labels be always up to date.
 --     * Parse JSON 'Value' according to the definition of form you created.
---     * Stop parsing immediately if given form is malformed and cannot be
+--     * Stop parsing immediately if a form is malformed and cannot be
 --       processed.
---     * Validate forms using any number of /composable/ checkers that you
+--     * Validate forms using any number of composable checkers that you
 --       write for your specific problem domain. Once you have a vocabulary
 --       of checkers, creation of new forms is just a matter of combining
---       them, and yes they do combine nicely.
+--       them.
 --     * Collect validation errors from multiple branches of parsing (one
---       branch per form field) in parallel, so validation errors in one
---       branch do not prevent us from collecting validation errors from
---       other branches. This allows for a better user experience as the
+--       branch per form field) in parallel, so that validation errors in
+--       one branch do not prevent us from collecting validation errors from
+--       other branches. This allows for better user experience as the
 --       user can see all validation errors at the same time.
 --     * Use 'optional' and @('<|>')@ from "Control.Applicative" in your
---       form definitions instead of ugly ad-hoc stuff.
+--       form definitions instead of ad-hoc helpers.
 --     * Perform validation using several form fields at once. You choose
 --       which “sub-region” of your form a given check will have access to,
 --       see 'withCheck'.
@@ -109,8 +109,9 @@ import GHC.TypeLits
 -- result.
 data FormResult (names :: [Symbol]) e a
   = -- | Parsing of JSON failed, this is fatal, we shut down and report the
-    -- parsing error. The first component specifies path to a problematic
-    -- field and the second component is the text of error message.
+    -- parsing error. The first component specifies the path to a
+    -- problematic field and the second component is the text of error
+    -- message.
     ParsingFailed (Maybe (FieldName names)) Text
   | -- | Validation of a field failed. This is also fatal but we still try
     -- to validate other branches (fields) to collect as many validation
@@ -160,10 +161,10 @@ instance Applicative (FormResult names e) where
   Succeeded _ <*> (ValidationFailed e) = ValidationFailed e
   Succeeded f <*> Succeeded x = Succeeded (f x)
 
--- | The type represents the parser that you can run on a 'Value' with the
--- help of 'runForm'. The only way for the user of the library to create a
--- parser is via the 'field' function and its friends, see below. Users can
--- combine existing parsers using applicative notation.
+-- | The type represents the parser that you can run on a 'Value' with help
+-- of 'runForm'. The only way for the user of the library to create a parser
+-- is via the 'field' function and its friends, see below. Users can combine
+-- existing parsers using applicative notation.
 --
 -- 'FormParser' is parametrized by four type variables:
 --
@@ -292,7 +293,7 @@ type family InSet (n :: Symbol) (ns :: [Symbol]) :: Constraint where
 -- >   "remember_me": true
 -- > }
 --
--- Once value of type @s@ is extracted, validation phase beings. The
+-- Once the value of type @s@ is extracted, the validation phase beings. The
 -- supplied checker (you can easily compose them with @('>=>')@, as they are
 -- Kleisli arrows) is applied to the @s@ value and validation either
 -- succeeds producing an @a@ value, or we collect an error as a value of @e@
