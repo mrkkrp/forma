@@ -86,9 +86,10 @@ where
 import Control.Applicative
 import Control.Monad.Except
 import Data.Aeson
+import qualified Data.Aeson.Key as Aeson.Key
+import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import qualified Data.Aeson.Types as A
 import Data.Functor.Identity (Identity (..))
-import qualified Data.HashMap.Strict as HM
 import Data.Kind
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
@@ -146,8 +147,12 @@ instance (ToJSON e, ToJSON a) => ToJSON (FormResult names e a) where
                       "message" .= msg
                     ],
             "field_errors"
-              .= let g (fieldName, err) = showFieldName fieldName .= err
-                  in maybe (Object HM.empty) (object . fmap g . M.toAscList) verr,
+              .= let g (fieldName, err) =
+                       Aeson.Key.fromText (showFieldName fieldName) .= err
+                  in maybe
+                       (Object Aeson.KeyMap.empty)
+                       (object . fmap g . M.toAscList)
+                       verr,
             "result" .= result
           ]
 
@@ -361,7 +366,10 @@ subParser ::
   -- | Wrapped parser
   FormParser names e m a
 subParser fieldName p = FormParser $ \v path -> do
-  let f = withObject "form field" (.: showFieldName fieldName)
+  let f =
+        withObject
+          "form field"
+          (.: Aeson.Key.fromText (showFieldName fieldName))
       path' = path <> Just fieldName
   case A.parseEither f v of
     Left msg -> do

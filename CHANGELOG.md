@@ -1,3 +1,7 @@
+## Forma 1.2.0
+
+* Works with `aeson-2.x.x.x`.
+
 ## Forma 1.1.3
 
 * Test suite passes with `aeson-1.4.6.0`.
