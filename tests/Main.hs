@@ -50,7 +50,8 @@ signupForm =
     <*> withCheck
       #password_confirmation
       passwordsMatch
-      ( (,) <$> field #password notEmpty
+      ( (,)
+          <$> field #password notEmpty
           <*> field #password_confirmation notEmpty
       )
 
