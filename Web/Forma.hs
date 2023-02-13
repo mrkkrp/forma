@@ -191,17 +191,17 @@ newtype FormParser (names :: [Symbol]) e m a = FormParser
       m (FormResult names e a)
   }
 
-instance Functor m => Functor (FormParser names e m) where
+instance (Functor m) => Functor (FormParser names e m) where
   fmap f (FormParser x) = FormParser $ \v path ->
     fmap (fmap f) (x v path)
 
-instance Applicative m => Applicative (FormParser names e m) where
+instance (Applicative m) => Applicative (FormParser names e m) where
   pure x = FormParser $ \_ _ ->
     pure (Succeeded x)
   (FormParser f) <*> (FormParser x) = FormParser $ \v path ->
     pure (<*>) <*> f v path <*> x v path
 
-instance Applicative m => Alternative (FormParser names e m) where
+instance (Applicative m) => Alternative (FormParser names e m) where
   empty = FormParser $ \_ _ ->
     pure (ParsingFailed Nothing "empty")
   (FormParser x) <|> (FormParser y) = FormParser $ \v path ->
@@ -358,7 +358,7 @@ value = FormParser $ \v path ->
 -- > }
 subParser ::
   forall (names :: [Symbol]) e m a.
-  Monad m =>
+  (Monad m) =>
   -- | Field name to descend to
   FieldName names ->
   -- | Subparser
@@ -402,7 +402,7 @@ subParser fieldName p = FormParser $ \v path -> do
 -- @\"password_form\"@ is correctly prepended to the field path).
 withCheck ::
   forall (names :: [Symbol]) e m a s.
-  Monad m =>
+  (Monad m) =>
   -- | Field to assign validation error to
   FieldName names ->
   -- | The check to perform
@@ -432,7 +432,7 @@ withCheck fieldName check (FormParser f) = FormParser $ \v path -> do
 
 -- | Run a parser on given input.
 runForm ::
-  Monad m =>
+  (Monad m) =>
   -- | The form parser to run
   FormParser names e m a ->
   -- | Input for the parser
