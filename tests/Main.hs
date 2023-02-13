@@ -22,14 +22,14 @@ data LoginForm = LoginForm
   }
   deriving (Eq, Show)
 
-loginForm :: Monad m => FormParser LoginFields Text m LoginForm
+loginForm :: (Monad m) => FormParser LoginFields Text m LoginForm
 loginForm =
   LoginForm
     <$> field #username notEmpty
     <*> field #password notEmpty
     <*> (empty <|> field' #remember_me <|> pure True)
 
-notEmpty :: Monad m => Text -> ExceptT Text m Text
+notEmpty :: (Monad m) => Text -> ExceptT Text m Text
 notEmpty txt =
   if T.null txt
     then throwError "This field cannot be empty."
@@ -43,7 +43,7 @@ data SignupForm = SignupForm
   }
   deriving (Eq, Show)
 
-signupForm :: Monad m => FormParser SignupFields Text m SignupForm
+signupForm :: (Monad m) => FormParser SignupFields Text m SignupForm
 signupForm =
   SignupForm
     <$> field #username notEmpty
@@ -55,7 +55,7 @@ signupForm =
           <*> field #password_confirmation notEmpty
       )
 
-passwordsMatch :: Monad m => (Text, Text) -> ExceptT Text m Text
+passwordsMatch :: (Monad m) => (Text, Text) -> ExceptT Text m Text
 passwordsMatch (a, b) =
   if a == b
     then return a
@@ -132,7 +132,7 @@ spec = do
             "result" .= ("Yeah" :: Text)
           ]
   describe "value" $ do
-    let text :: Monad m => FormParser names Text m Text
+    let text :: (Monad m) => FormParser names Text m Text
         text = value
     context "when the data is convertable" $
       it "succeeds" $ do
@@ -148,7 +148,7 @@ spec = do
             Nothing
             "parsing Text failed, expected String, but encountered Boolean"
   describe "subParser" $ do
-    let p :: Monad m => FormParser LoginFields Text m Text
+    let p :: (Monad m) => FormParser LoginFields Text m Text
         p =
           withCheck #username notEmpty $
             subParser #username $
@@ -212,7 +212,7 @@ spec = do
       r <- runForm p input
       r `shouldBe` ValidationFailed (M.singleton #username msg)
   describe "withCheck" $ do
-    let p :: Monad m => FormParser LoginFields Text m Text
+    let p :: (Monad m) => FormParser LoginFields Text m Text
         p =
           subParser #username $
             subParser #password $
