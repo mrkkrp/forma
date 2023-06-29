@@ -429,7 +429,6 @@ withCheck fieldName check (FormParser f) = FormParser $ \v path -> do
 
 -- | Run a parser on given input.
 runForm ::
-  (Monad m) =>
   -- | The form parser to run
   FormParser names e m a ->
   -- | Input for the parser

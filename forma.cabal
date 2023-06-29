@@ -36,15 +36,12 @@ library
         text >=0.2 && <2.1
 
     if flag(dev)
-        ghc-options: -Wall -Werror
+        ghc-options:
+            -Wall -Werror -Wredundant-constraints -Wpartial-fields
+            -Wunused-packages
 
     else
         ghc-options: -O2 -Wall
-
-    if flag(dev)
-        ghc-options:
-            -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns
-            -Wnoncanonical-monad-instances
 
 test-suite tests
     type:             exitcode-stdio-1.0
@@ -61,7 +58,9 @@ test-suite tests
         text >=0.2 && <2.1
 
     if flag(dev)
-        ghc-options: -Wall -Werror
+        ghc-options:
+            -Wall -Werror -Wredundant-constraints -Wpartial-fields
+            -Wunused-packages
 
     else
         ghc-options: -O2 -Wall
