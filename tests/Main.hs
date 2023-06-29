@@ -7,9 +7,9 @@ module Main (main) where
 import Control.Applicative
 import Control.Monad.Except
 import Data.Aeson
-import qualified Data.Map.Strict as M
+import Data.Map.Strict qualified as M
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Test.Hspec
 import Web.Forma
 
