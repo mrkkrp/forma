@@ -4,7 +4,7 @@
 [![Hackage](https://img.shields.io/hackage/v/forma.svg?style=flat)](https://hackage.haskell.org/package/forma)
 [![Stackage Nightly](http://stackage.org/package/forma/badge/nightly)](http://stackage.org/nightly/package/forma)
 [![Stackage LTS](http://stackage.org/package/forma/badge/lts)](http://stackage.org/lts/package/forma)
-![CI](https://github.com/mrkkrp/forma/workflows/CI/badge.svg?branch=master)
+[![CI](https://github.com/mrkkrp/forma/actions/workflows/ci.yaml/badge.svg)](https://github.com/mrkkrp/forma/actions/workflows/ci.yaml)
 
 This library provides a tool for validation of forms in the JSON format.
 Sending forms in the JSON format via an AJAX request instead of traditional
