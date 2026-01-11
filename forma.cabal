@@ -31,7 +31,7 @@ library
     build-depends:
         aeson >=2 && <3,
         base >=4.15 && <5,
-        containers >=0.5 && <0.8,
+        containers >=0.5 && <0.9,
         mtl >=2 && <3,
         text >=0.2 && <2.2
 
@@ -51,7 +51,7 @@ test-suite tests
     build-depends:
         aeson >=2 && <3,
         base >=4.15 && <5,
-        containers >=0.5 && <0.8,
+        containers >=0.5 && <0.9,
         forma,
         hspec >=2 && <3,
         mtl >=2 && <3,
