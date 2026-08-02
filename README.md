@@ -12,9 +12,9 @@ submitting of forms has a number of advantages:
 
 * Smoother user experience: no need to reload the whole page.
 
-* Form rendering is separated and lives only in GET handler, POST (or
-  whatever method you deem appropriate for your use case) handler only
-  handles validation and effects that form submission should initiate.
+* Form rendering is separated and lives only in the GET handler; the POST
+  (or whatever method you deem appropriate for your use case) handler only
+  handles validation and the effects that form submission should initiate.
 
 * You get a chance to organize form input the way you want.
 
@@ -22,10 +22,10 @@ The task of validation of a form in the JSON format may seem simple, but
 it's not trivial to get it right. The library allows you to:
 
 * Define a form parser using type-safe applicative notation with field
-  labels stored on the type label which guards against typos and will force
-  all your field labels to be always up to date.
+  labels stored at the type level, which guards against typos and will force
+  all your field labels to always be up to date.
 
-* Parse JSON `Value` according to the definition of form you created.
+* Parse a JSON `Value` according to the definition of the form you created.
 
 * Stop parsing immediately if a form is malformed and cannot be processed.
 
@@ -110,4 +110,4 @@ Pull requests are also welcome.
 
 Copyright © 2017–present Mark Karpov
 
-Distributed under BSD 3 clause license.
+Distributed under the BSD 3-clause license.

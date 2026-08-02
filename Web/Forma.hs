@@ -24,19 +24,20 @@
 -- traditional submitting of forms has a number of advantages:
 --
 --     * Smoother user experience: no need to reload the whole page.
---     * Form rendering is separated and lives only in GET handler, POST (or
---       whatever method you deem appropriate for your use case) handler
---       only handles validation and effects that form submission should
---       initiate.
+--     * Form rendering is separated and lives only in the GET handler; the
+--       POST (or whatever method you deem appropriate for your use case)
+--       handler only handles validation and the effects that form
+--       submission should initiate.
 --     * You get a chance to organize form input the way you want.
 --
 -- The task of validation of a form in the JSON format may seem simple, but
 -- it's not trivial to get it right. The library allows you to:
 --
 --     * Define a form parser using type-safe applicative notation with field
---       labels stored on the type label which guards against typos
---       and will force all your field labels be always up to date.
---     * Parse JSON 'Value' according to the definition of form you created.
+--       labels stored at the type level, which guards against typos
+--       and will force all your field labels to always be up to date.
+--     * Parse a JSON 'Value' according to the definition of the form you
+--       created.
 --     * Stop parsing immediately if a form is malformed and cannot be
 --       processed.
 --     * Validate forms using any number of composable checkers that you
@@ -211,8 +212,8 @@ instance (Applicative m) => Alternative (FormParser names e m) where
 
 -- | @'FieldName' names@ represents a non-empty vector of 'Text' components
 -- that serve as a path to some field in a JSON structure. Every component
--- is guaranteed to be in the @names@, which is a set of strings on type
--- level. The purpose if this type is to avoid typos and to force users to
+-- is guaranteed to be in the @names@, which is a set of strings at the type
+-- level. The purpose of this type is to avoid typos and to force users to
 -- update field names everywhere when they decide to change them. The only
 -- way to obtain a value of the type 'FieldName' is by using
 -- @OverloadedLabels@. Note that you can combine field names using @('<>')@.
@@ -241,7 +242,7 @@ instance ToJSON (FieldName names) where
 unFieldName :: FieldName names -> NonEmpty Text
 unFieldName (FieldName path) = path
 
--- | Project textual representation of path to a field.
+-- | Project the textual representation of the path to a field.
 showFieldName :: FieldName names -> Text
 showFieldName = T.intercalate "." . NE.toList . unFieldName
 
@@ -285,9 +286,9 @@ type family InSet (n :: Symbol) (ns :: [Symbol]) :: Constraint where
 --
 -- Referring to the types in the function's signature, @s@ is extracted from
 -- JSON 'Value' for you automatically using its 'FromJSON' instance. The
--- field value is taken in assumption that top level 'Value' is a
--- dictionary, and field name is a key in that dictionary. So for example a
--- valid JSON input for the form shown above could be this:
+-- field value is taken on the assumption that the top-level 'Value' is a
+-- dictionary, and the field name is a key in that dictionary. So for example
+-- a valid JSON input for the form shown above could be this:
 --
 -- > {
 -- >   "username": "Bob",
@@ -295,7 +296,7 @@ type family InSet (n :: Symbol) (ns :: [Symbol]) :: Constraint where
 -- >   "remember_me": true
 -- > }
 --
--- Once the value of type @s@ is extracted, the validation phase beings. The
+-- Once the value of type @s@ is extracted, the validation phase begins. The
 -- supplied checker (you can easily compose them with @('>=>')@, as they are
 -- Kleisli arrows) is applied to the @s@ value and validation either
 -- succeeds producing an @a@ value, or we collect an error as a value of @e@
@@ -389,8 +390,8 @@ subParser fieldName p = FormParser $ \v path -> do
 --
 -- Note that you must specify the field name on which to add a validation
 -- error message in case the check fails. The field name should be relative
--- and point to a field in the argument parser, not full path from top-level
--- of the form. For example this form:
+-- and point to a field in the argument parser, not a full path from the top
+-- level of the form. For example this form:
 --
 -- > biggerForm = subParser #password_form passwordForm
 --
@@ -427,7 +428,7 @@ withCheck fieldName check (FormParser f) = FormParser $ \v path -> do
 ----------------------------------------------------------------------------
 -- Running a form
 
--- | Run a parser on given input.
+-- | Run a parser on the given input.
 runForm ::
   -- | The form parser to run
   FormParser names e m a ->

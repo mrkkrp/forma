@@ -150,10 +150,10 @@ spec = do
   describe "subParser" $ do
     let p :: (Monad m) => FormParser LoginFields Text m Text
         p =
-          withCheck #username notEmpty $
-            subParser #username $
-              subParser #password $
-                field' #remember_me
+          withCheck #username notEmpty
+            $ subParser #username
+            $ subParser #password
+            $ field' #remember_me
     it "accesses fields correctly" $ do
       let txt = "Foo"
           input =
@@ -214,9 +214,9 @@ spec = do
   describe "withCheck" $ do
     let p :: (Monad m) => FormParser LoginFields Text m Text
         p =
-          subParser #username $
-            subParser #password $
-              field #remember_me notEmpty
+          subParser #username
+            $ subParser #password
+            $ field #remember_me notEmpty
     it "reports correct path and error when parsing fails" $ do
       let input =
             object
